@@ -1,0 +1,8 @@
+{
+  "name": "atlas",
+  "private": true,
+  "workspaces": [
+    "sdk/ts",
+    "plugins/veil"
+  ]
+}

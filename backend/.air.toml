@@ -1,0 +1,15 @@
+# Live-reload for the Go backend. Rebuilds + restarts on any .go change.
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/atlas ."
+bin = "./tmp/atlas"
+delay = 300
+include_ext = ["go"]
+exclude_dir = ["tmp"]
+stop_on_error = true
+kill_delay = "2s"
+
+[misc]
+clean_on_exit = true

@@ -1,0 +1,11 @@
+{
+  "name": "@atlas/plugin-sdk",
+  "version": "0.1.0",
+  "description": "Atlas plugin SDK (TypeScript/Bun) — JSON-RPC 2.0 HTTP plugin helper",
+  "type": "module",
+  "module": "src/index.ts",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

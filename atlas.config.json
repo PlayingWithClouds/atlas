@@ -1,0 +1,1023 @@
+{
+  "title": "atlas",
+  "primitives": [
+    "tag"
+  ],
+  "labels": {
+    "groups": [
+      {
+        "id": "acts",
+        "label": "acts",
+        "classes": [
+          {
+            "name": "vaginal",
+            "icon": "\ud83c\udf51",
+            "info": "Penile\u2013vaginal penetration."
+          },
+          {
+            "name": "anal",
+            "icon": "\ud83c\udf51",
+            "info": "Penile\u2013anal penetration.",
+            "thumbnail": "/category-icons/anal.jpg"
+          },
+          {
+            "name": "blowjob",
+            "icon": "\ud83d\udc44",
+            "info": "Oral stimulation of a penis.",
+            "thumbnail": "/category-icons/blowjob.jpg"
+          },
+          {
+            "name": "pussy-eating",
+            "icon": "\ud83d\udc45",
+            "info": "Eating/licking a vulva (colloquial cunnilingus).",
+            "thumbnail": "/category-icons/pussy-eating.jpg"
+          },
+          {
+            "name": "rimjob",
+            "icon": "\ud83d\udc45",
+            "info": "Oral\u2013anal stimulation."
+          },
+          {
+            "name": "handjob",
+            "icon": "\u270b",
+            "info": "Manual stimulation of a penis.",
+            "thumbnail": "/category-icons/handjob.jpg"
+          },
+          {
+            "name": "fingering",
+            "icon": "\ud83d\udc46",
+            "info": "Digital vaginal or anal stimulation.",
+            "thumbnail": "/category-icons/fingering.jpg"
+          },
+          {
+            "name": "titfuck",
+            "icon": "\ud83d\ude4c",
+            "info": "Penis stimulated between the breasts.",
+            "thumbnail": "/category-icons/titfuck.jpg"
+          },
+          {
+            "name": "footjob",
+            "icon": "\ud83e\uddb6",
+            "info": "Stimulation with the feet.",
+            "thumbnail": "/category-icons/footjob.jpg"
+          },
+          {
+            "name": "deepthroat",
+            "icon": "\ud83d\ude2e",
+            "info": "Oral taking the penis deep into the throat.",
+            "thumbnail": "/category-icons/deepthroat.jpg"
+          },
+          {
+            "name": "facefuck",
+            "icon": "\ud83d\ude35",
+            "info": "Aggressive throat penetration, thrusting controlled by the penetrating partner.",
+            "thumbnail": "/category-icons/facefuck.jpg"
+          },
+          {
+            "name": "upside-down-facefuck",
+            "icon": "\ud83d\ude43",
+            "info": "Facefuck with the receiver's head inverted, hanging off a bed/surface edge."
+          },
+          {
+            "name": "masturbation",
+            "icon": "\ud83d\udd90\ufe0f",
+            "info": "Self-stimulation, no partner contact.",
+            "thumbnail": "/category-icons/masturbation.jpg"
+          },
+          {
+            "name": "fisting",
+            "icon": "\u270a",
+            "info": "Insertion of the hand/fist.",
+            "thumbnail": "/category-icons/fisting.jpg"
+          },
+          {
+            "name": "tit-grabbing",
+            "icon": "\ud83e\udef4",
+            "info": "Hands grabbing/squeezing the breasts."
+          },
+          {
+            "name": "tit-sucking",
+            "icon": "\ud83d\udc44",
+            "info": "Mouth on the nipple/breast."
+          },
+          {
+            "name": "ass-grabbing",
+            "icon": "\ud83e\udef4",
+            "info": "Hands gripping the buttocks."
+          },
+          {
+            "name": "ball-sucking",
+            "icon": "\ud83d\udc45",
+            "info": "Oral stimulation of the testicles."
+          },
+          {
+            "name": "grinding",
+            "icon": "\ud83d\udd25",
+            "info": "Rubbing/humping without penetration."
+          },
+          {
+            "name": "gagging",
+            "icon": "\ud83d\ude16",
+            "info": "Visible gag reflex during oral (distinct from deepthroat)."
+          },
+          {
+            "name": "scissoring",
+            "icon": "\u2702\ufe0f",
+            "info": "Tribbing \u2014 vulva-to-vulva grinding, legs interlocked."
+          },
+          {
+            "name": "mutual-masturbation",
+            "icon": "\ud83e\udd1d",
+            "info": "Partners masturbating themselves or each other simultaneously."
+          },
+          {
+            "name": "massage",
+            "icon": "\ud83d\udc86",
+            "info": "Massage segment \u2014 table, oil, rubbing; typically a scene opener."
+          },
+          {
+            "name": "fucking-machine",
+            "icon": "\u2699\ufe0f",
+            "info": "Penetration by a mechanical fucking machine."
+          },
+          {
+            "name": "kissing",
+            "icon": "\ud83d\udc8b",
+            "info": "Mouth-to-mouth kissing."
+          },
+          {
+            "name": "ass-to-mouth",
+            "icon": "\ud83d\udd00",
+            "info": "Penetration moving from anus directly to mouth (ATM)."
+          },
+          {
+            "name": "strapon",
+            "icon": "\ud83c\udf46",
+            "info": "Penetration using a strap-on dildo.",
+            "thumbnail": "/category-icons/strapon.jpg"
+          },
+          {
+            "name": "pegging",
+            "icon": "\ud83c\udf46",
+            "info": "A woman penetrating a partner anally with a strap-on.",
+            "thumbnail": "/category-icons/pegging.jpg"
+          },
+          {
+            "name": "gape",
+            "icon": "\ud83d\udd73\ufe0f",
+            "info": "An orifice held visibly open after penetration.",
+            "thumbnail": "/category-icons/gape.jpg"
+          },
+          {
+            "name": "anal-gape",
+            "icon": "\ud83d\udd73\ufe0f",
+            "info": "Anus held visibly open after anal penetration.",
+            "thumbnail": "/category-icons/anal-gape.jpg"
+          }
+        ]
+      },
+      {
+        "id": "positions",
+        "label": "positions",
+        "classes": [
+          {
+            "name": "missionary",
+            "icon": "\ud83d\udecf\ufe0f",
+            "info": "Receiver on back, partner on top, face-to-face."
+          },
+          {
+            "name": "doggy",
+            "icon": "\ud83d\udc15",
+            "info": "Receiver on hands and knees, penetration from behind."
+          },
+          {
+            "name": "cowgirl",
+            "icon": "\ud83e\udd20",
+            "info": "Receiver on top, straddling and facing the partner."
+          },
+          {
+            "name": "reverse-cowgirl",
+            "icon": "\ud83d\udd04",
+            "info": "On top, straddling but facing away."
+          },
+          {
+            "name": "spooning",
+            "icon": "\ud83e\udd44",
+            "info": "Both on their side, penetration from behind."
+          },
+          {
+            "name": "standing",
+            "icon": "\ud83e\uddcd",
+            "info": "Both partners upright."
+          },
+          {
+            "name": "prone-bone",
+            "icon": "\u2b07\ufe0f",
+            "info": "Receiver lies face-down flat, penetration from behind."
+          },
+          {
+            "name": "sixtynine",
+            "icon": "6\ufe0f\u20e3",
+            "info": "Simultaneous mutual oral, bodies inverted (69)."
+          },
+          {
+            "name": "face-sitting",
+            "icon": "\ud83e\ude91",
+            "info": "Receiver sits on a partner's face (queening) for oral."
+          },
+          {
+            "name": "piledriver",
+            "icon": "\ud83d\udd29",
+            "info": "Receiver inverted, hips overhead, penetration downward."
+          },
+          {
+            "name": "mating-press",
+            "icon": "\ud83e\udd3c",
+            "info": "Missionary with legs pinned back, deep downward angle."
+          },
+          {
+            "name": "amazon",
+            "icon": "\ud83c\udfc7",
+            "info": "Partner on back with legs raised; rider straddles on top."
+          },
+          {
+            "name": "lotus",
+            "icon": "\ud83e\uddd8",
+            "info": "Seated face-to-face, receiver in partner's lap, legs wrapped."
+          },
+          {
+            "name": "against-wall",
+            "icon": "\ud83e\uddf1",
+            "info": "Standing, receiver pressed against a wall."
+          },
+          {
+            "name": "legs-up",
+            "icon": "\ud83e\uddb5",
+            "info": "Receiver on back with legs raised or held together."
+          },
+          {
+            "name": "full-nelson",
+            "icon": "\ud83d\udcaa",
+            "info": "From behind, arms hooked under the receiver's knees/shoulders."
+          },
+          {
+            "name": "suspended",
+            "icon": "\ud83c\udfaa",
+            "info": "Receiver lifted and held in the air during penetration."
+          },
+          {
+            "name": "kneeling",
+            "icon": "\ud83e\uddce",
+            "info": "Receiver kneeling, typically during oral."
+          },
+          {
+            "name": "bent-over",
+            "icon": "\u21a9\ufe0f",
+            "info": "Standing, bent at the waist, penetration from behind."
+          }
+        ]
+      },
+      {
+        "id": "finish",
+        "label": "finish",
+        "classes": [
+          {
+            "name": "cumshot",
+            "icon": "\ud83d\udca6",
+            "info": "Visible external ejaculation.",
+            "thumbnail": "/category-icons/cumshot.jpg"
+          },
+          {
+            "name": "facial",
+            "icon": "\ud83d\ude33",
+            "info": "Ejaculation onto the face."
+          },
+          {
+            "name": "creampie",
+            "icon": "\ud83e\udd67",
+            "info": "Internal ejaculation, shown afterward.",
+            "thumbnail": "/category-icons/creampie.jpg"
+          },
+          {
+            "name": "cumplay",
+            "icon": "\ud83d\udc45",
+            "info": "Playing with / manipulating semen after ejaculation."
+          },
+          {
+            "name": "cumswap",
+            "icon": "\ud83d\udd01",
+            "info": "Passing semen mouth-to-mouth between performers."
+          },
+          {
+            "name": "swallow",
+            "icon": "\ud83d\ude0b",
+            "info": "Swallowing ejaculate."
+          },
+          {
+            "name": "cum-in-mouth",
+            "icon": "\ud83d\udc44",
+            "info": "Ejaculation into the mouth."
+          },
+          {
+            "name": "cum-on-tits",
+            "icon": "\ud83d\udca6",
+            "info": "Ejaculation onto the breasts."
+          },
+          {
+            "name": "cum-on-ass",
+            "icon": "\ud83d\udca6",
+            "info": "Ejaculation onto the buttocks."
+          },
+          {
+            "name": "oral-creampie",
+            "icon": "\ud83d\udc44",
+            "info": "Ejaculation in the mouth during oral, shown afterward."
+          },
+          {
+            "name": "squirting",
+            "icon": "\u26f2",
+            "info": "Female ejaculation / squirting.",
+            "thumbnail": "/category-icons/squirting.jpg"
+          },
+          {
+            "name": "bukkake",
+            "icon": "\ud83d\udca6",
+            "info": "Multiple partners ejaculating onto one person.",
+            "thumbnail": "/category-icons/bukkake.jpg"
+          },
+          {
+            "name": "ahegao",
+            "icon": "\ud83d\ude35\u200d\ud83d\udcab",
+            "info": "Exaggerated orgasm face \u2014 rolled eyes, tongue out."
+          }
+        ]
+      },
+      {
+        "id": "configuration",
+        "label": "configuration",
+        "classes": [
+          {
+            "name": "solo",
+            "icon": "1\ufe0f\u20e3",
+            "info": "A single performer.",
+            "thumbnail": "/category-icons/solo.jpg"
+          },
+          {
+            "name": "threesome",
+            "icon": "3\ufe0f\u20e3",
+            "info": "Three participants.",
+            "thumbnail": "/category-icons/threesome.jpg"
+          },
+          {
+            "name": "foursome",
+            "icon": "4\ufe0f\u20e3",
+            "info": "Four participants."
+          },
+          {
+            "name": "group",
+            "icon": "\ud83d\udc65",
+            "info": "Five or more participants.",
+            "thumbnail": "/category-icons/group.jpg"
+          },
+          {
+            "name": "gangbang",
+            "icon": "\ud83d\udc68\u200d\ud83d\udc68\u200d\ud83d\udc66",
+            "info": "Multiple partners on a single receiver.",
+            "thumbnail": "/category-icons/gangbang.jpg"
+          },
+          {
+            "name": "double-penetration",
+            "icon": "\u270c\ufe0f",
+            "info": "Two simultaneous penetrations.",
+            "thumbnail": "/category-icons/double-penetration.jpg"
+          },
+          {
+            "name": "gloryhole",
+            "icon": "\ud83d\udd73\ufe0f",
+            "info": "Penis through a hole in a wall/partition."
+          }
+        ]
+      },
+      {
+        "id": "framing",
+        "label": "framing",
+        "classes": [
+          {
+            "name": "pov",
+            "icon": "\ud83c\udfa5",
+            "info": "Point-of-view: camera acts as a participant.",
+            "thumbnail": "/category-icons/pov.jpg"
+          },
+          {
+            "name": "spreading",
+            "icon": "\ud83e\udef8",
+            "info": "Performer holds their genitals open toward the camera."
+          },
+          {
+            "name": "pov-giving",
+            "icon": "\ud83e\udd33",
+            "info": "Camera is the performer giving the act."
+          },
+          {
+            "name": "pov-receiving",
+            "icon": "\ud83d\ude2e",
+            "info": "Camera is the performer receiving the act."
+          },
+          {
+            "name": "mirror",
+            "icon": "\ud83e\ude9e",
+            "info": "Shot through a mirror or reflection."
+          },
+          {
+            "name": "overhead",
+            "icon": "\ud83d\udd1d",
+            "info": "Camera looking down from above."
+          },
+          {
+            "name": "wide-shot",
+            "icon": "\ud83d\uddbc\ufe0f",
+            "info": "Full bodies in frame, whole scene visible."
+          },
+          {
+            "name": "handheld",
+            "icon": "\ud83d\udcf9",
+            "info": "Visibly hand-held, unstable camera."
+          },
+          {
+            "name": "face-visible",
+            "icon": "\ud83d\ude42",
+            "info": "The performer's face is in frame."
+          },
+          {
+            "name": "eye-contact",
+            "icon": "\ud83d\udc41\ufe0f",
+            "info": "Performer looking into the camera."
+          },
+          {
+            "name": "penetration-visible",
+            "icon": "\ud83d\udd0d",
+            "info": "Penetration is actually in frame, not implied or offscreen."
+          }
+        ]
+      },
+      {
+        "id": "pose",
+        "label": "pose",
+        "classes": [
+          {
+            "name": "posing",
+            "icon": "\ud83d\udcf8",
+            "info": "Softcore/glamour pose, no sexual act.",
+            "thumbnail": "/category-icons/posing.jpg"
+          },
+          {
+            "name": "presenting",
+            "icon": "\ud83c\udf51",
+            "info": "Ass or genitals angled toward the camera, not spread.",
+            "thumbnail": "/category-icons/presenting.jpg"
+          },
+          {
+            "name": "stripping",
+            "icon": "\ud83d\udc57",
+            "info": "Undressing/tease segment, no sexual act yet."
+          }
+        ]
+      },
+      {
+        "id": "setting",
+        "label": "setting",
+        "classes": [
+          {
+            "name": "outdoor",
+            "icon": "\ud83c\udf33",
+            "info": "Takes place outdoors.",
+            "thumbnail": "/category-icons/outdoor.jpg"
+          },
+          {
+            "name": "public",
+            "icon": "\ud83c\udfd9\ufe0f",
+            "info": "In a public or semi-public place.",
+            "thumbnail": "/category-icons/public.jpg"
+          },
+          {
+            "name": "shower",
+            "icon": "\ud83d\udebf",
+            "info": "In a shower or bathtub."
+          },
+          {
+            "name": "car",
+            "icon": "\ud83d\ude97",
+            "info": "Inside a car."
+          }
+        ]
+      },
+      {
+        "id": "bdsm",
+        "label": "bdsm",
+        "classes": [
+          {
+            "name": "bondage",
+            "icon": "\u26d3\ufe0f",
+            "info": "Restraints \u2014 rope, cuffs, ties.",
+            "thumbnail": "/category-icons/bondage.jpg"
+          },
+          {
+            "name": "choking",
+            "icon": "\ud83e\udef3",
+            "info": "A hand around the throat.",
+            "thumbnail": "/category-icons/choking.jpg"
+          },
+          {
+            "name": "spanking",
+            "icon": "\u270b",
+            "info": "Striking the buttocks.",
+            "thumbnail": "/category-icons/spanking.jpg"
+          },
+          {
+            "name": "hair-pulling",
+            "icon": "\ud83d\udc87",
+            "info": "Pulling the hair during the act.",
+            "thumbnail": "/category-icons/hair-pulling.jpg"
+          },
+          {
+            "name": "gagged",
+            "icon": "\ud83d\udd07",
+            "info": "Mouth gagged \u2014 ball gag, tape, cloth."
+          },
+          {
+            "name": "blindfold",
+            "icon": "\ud83d\ude48",
+            "info": "Eyes covered with a blindfold."
+          },
+          {
+            "name": "collar-leash",
+            "icon": "\ud83d\udc15",
+            "info": "Collar worn, with or without a leash."
+          },
+          {
+            "name": "slapping",
+            "icon": "\ud83d\udc4b",
+            "info": "Face or body slaps (spanking covers the buttocks)."
+          },
+          {
+            "name": "shibari",
+            "icon": "\ud83e\udea2",
+            "info": "Decorative rope work, distinct from plain restraint."
+          },
+          {
+            "name": "impact-play",
+            "icon": "\ud83c\udfd3",
+            "info": "Flogger, paddle or crop, rather than a bare hand."
+          },
+          {
+            "name": "wax",
+            "icon": "\ud83d\udd6f\ufe0f",
+            "info": "Hot wax on the skin."
+          },
+          {
+            "name": "face-slapping",
+            "icon": "\ud83e\udd1a",
+            "info": "Slapping to the face specifically."
+          },
+          {
+            "name": "hands-restrained",
+            "icon": "\u26d3\ufe0f",
+            "info": "Hands bound or cuffed."
+          }
+        ]
+      },
+      {
+        "id": "fetish",
+        "label": "fetish",
+        "classes": [
+          {
+            "name": "feet",
+            "icon": "\ud83e\uddb6",
+            "info": "Feet as a focus of the shot (foot fetish).",
+            "thumbnail": "/category-icons/feet.jpg"
+          },
+          {
+            "name": "pissing",
+            "icon": "\ud83d\udebf",
+            "info": "Urination as part of the act (watersports).",
+            "thumbnail": "/category-icons/pissing.jpg"
+          },
+          {
+            "name": "piss-drinking",
+            "icon": "\ud83e\udd64",
+            "info": "Drinking urine \u2014 from the source, a glass, or over the mouth."
+          },
+          {
+            "name": "vomit",
+            "icon": "\ud83e\udd2e",
+            "info": "Gagging to the point of vomiting."
+          }
+        ]
+      },
+      {
+        "id": "state",
+        "label": "state",
+        "classes": [
+          {
+            "name": "clothed",
+            "icon": "\ud83d\udc55",
+            "info": "Performers are dressed."
+          },
+          {
+            "name": "lingerie",
+            "icon": "\ud83e\ude72",
+            "info": "Lingerie worn.",
+            "thumbnail": "/category-icons/lingerie.jpg"
+          },
+          {
+            "name": "nude",
+            "icon": "\ud83d\udeab",
+            "info": "Fully undressed."
+          },
+          {
+            "name": "toy",
+            "icon": "\ud83e\uddf8",
+            "info": "A sex toy is in use.",
+            "thumbnail": "/category-icons/toy.jpg"
+          },
+          {
+            "name": "saliva",
+            "icon": "\ud83d\udca7",
+            "info": "Visible saliva/drool/spit \u2014 chin, strung from the mouth, or over a penis."
+          },
+          {
+            "name": "stockings",
+            "icon": "\ud83e\udde6",
+            "info": "Stockings or thigh-highs worn."
+          },
+          {
+            "name": "topless",
+            "icon": "\ud83d\udc59",
+            "info": "Breasts exposed, lower body covered."
+          },
+          {
+            "name": "oiled",
+            "icon": "\u2728",
+            "info": "Skin visibly oiled/glistening."
+          },
+          {
+            "name": "panties-aside",
+            "icon": "\ud83e\ude72",
+            "info": "Underwear pulled aside rather than removed."
+          },
+          {
+            "name": "partially-clothed",
+            "icon": "\ud83d\udc55",
+            "info": "Some clothing still on during the act."
+          },
+          {
+            "name": "heels",
+            "icon": "\ud83d\udc60",
+            "info": "Heels worn during the scene."
+          },
+          {
+            "name": "wet",
+            "icon": "\ud83d\udca6",
+            "info": "Wet skin, hair or clothing."
+          },
+          {
+            "name": "condom",
+            "icon": "\ud83c\udf88",
+            "info": "A condom is visibly in use."
+          },
+          {
+            "name": "lube",
+            "icon": "\ud83e\uddf4",
+            "info": "Lubricant being applied."
+          }
+        ]
+      },
+      {
+        "id": "production",
+        "label": "Production",
+        "classes": [
+          {
+            "name": "censored",
+            "icon": "\ud83d\udd32",
+            "info": "Mosaic or bar censoring over the genitals."
+          },
+          {
+            "name": "subtitled",
+            "icon": "\ud83d\udcac",
+            "info": "Burned-in subtitles on the frame."
+          },
+          {
+            "name": "split-screen",
+            "icon": "\ud83e\ude9f",
+            "info": "Two angles or picture-in-picture at once."
+          },
+          {
+            "name": "low-light",
+            "icon": "\ud83c\udf11",
+            "info": "Dark or night-vision footage."
+          },
+          {
+            "name": "on-screen-text",
+            "icon": "\ud83d\udd20",
+            "info": "Burned-in text: timestamps, counters, site chrome."
+          }
+        ]
+      },
+      {
+        "id": "structure",
+        "label": "Structure",
+        "classes": [
+          {
+            "name": "dialogue",
+            "icon": "\ud83d\udde3\ufe0f",
+            "info": "Talking, no sexual action in progress."
+          },
+          {
+            "name": "interview",
+            "icon": "\ud83c\udfa4",
+            "info": "Casting or interview framing before the scene."
+          },
+          {
+            "name": "establishing",
+            "icon": "\ud83d\udeaa",
+            "info": "Arrival or setup; clothes still on, nothing started."
+          },
+          {
+            "name": "foreplay",
+            "icon": "\ud83d\udc9e",
+            "info": "Kissing or touching before penetration."
+          },
+          {
+            "name": "transition",
+            "icon": "\ud83d\udd04",
+            "info": "Changing position; the act is paused."
+          },
+          {
+            "name": "aftermath",
+            "icon": "\ud83c\udf17",
+            "info": "Immediately after the scene, action over."
+          },
+          {
+            "name": "cleanup",
+            "icon": "\ud83e\uddfb",
+            "info": "Wiping or washing after the scene."
+          },
+          {
+            "name": "title-card",
+            "icon": "\ud83c\udfac",
+            "info": "Studio branding or title frame."
+          }
+        ]
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "id": "veil",
+      "url": "http://localhost:9101"
+    },
+    {
+      "id": "fs",
+      "url": "http://localhost:9102"
+    },
+    {
+      "id": "model",
+      "url": "http://localhost:9301"
+    },
+    {
+      "id": "joytag",
+      "url": "http://localhost:9302"
+    },
+    {
+      "id": "siglip",
+      "url": "http://localhost:9303"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "new-workflow",
+      "label": "Segment Video",
+      "project": "porn-videos",
+      "triggers": [
+        "manual",
+        "session_created"
+      ],
+      "graph": {
+        "nodes": [
+          {
+            "id": "source-0",
+            "type": "source",
+            "pos": {
+              "x": 80,
+              "y": 120
+            }
+          },
+          {
+            "id": "segment-1",
+            "type": "segment",
+            "params": {
+              "minLen": 3,
+              "mode": "scenes",
+              "stride": 4,
+              "window": 4
+            },
+            "pos": {
+              "x": 405.3,
+              "y": 85
+            }
+          }
+        ],
+        "edges": [
+          {
+            "source": "source-0",
+            "target": "segment-1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "session-workflow",
+      "label": "Session Workflow",
+      "project": "nsfw-tags",
+      "triggers": [
+        "manual",
+        "session_created"
+      ],
+      "graph": {
+        "nodes": [
+          {
+            "id": "source-0",
+            "type": "source",
+            "pos": {
+              "x": 80,
+              "y": 120
+            }
+          },
+          {
+            "id": "embed-1",
+            "type": "embed",
+            "pos": {
+              "x": 548.9,
+              "y": 83.6
+            }
+          },
+          {
+            "id": "dedupe-2",
+            "type": "dedupe",
+            "params": {
+              "action": "delete",
+              "threshold": 0.93
+            },
+            "pos": {
+              "x": 895.5,
+              "y": -23.6
+            }
+          },
+          {
+            "id": "predict-3",
+            "type": "predict",
+            "params": {
+              "threshold": 0.6
+            },
+            "pos": {
+              "x": 1308.3,
+              "y": 74
+            }
+          },
+          {
+            "id": "save-4",
+            "type": "save",
+            "params": {
+              "mode": "propose"
+            },
+            "pos": {
+              "x": 1677.8999999999999,
+              "y": 71.8
+            }
+          },
+          {
+            "id": "notify-5",
+            "type": "notify",
+            "params": {
+              "message": "Done - {{count}} images embedded."
+            },
+            "pos": {
+              "x": 2031.5,
+              "y": 79.4
+            }
+          }
+        ],
+        "edges": [
+          {
+            "source": "embed-1",
+            "target": "dedupe-2"
+          },
+          {
+            "source": "source-0",
+            "target": "embed-1"
+          },
+          {
+            "source": "dedupe-2",
+            "target": "predict-3"
+          },
+          {
+            "source": "predict-3",
+            "target": "save-4"
+          },
+          {
+            "source": "save-4",
+            "target": "notify-5"
+          }
+        ]
+      }
+    },
+    {
+      "id": "embed-videos",
+      "label": "Embed Videos",
+      "project": "porn-videos",
+      "triggers": [
+        "manual"
+      ],
+      "graph": {
+        "nodes": [
+          {
+            "id": "source-0",
+            "type": "source",
+            "pos": {
+              "x": -404.2,
+              "y": 46.80000000000001
+            }
+          },
+          {
+            "id": "embed-1",
+            "type": "siglip.embed",
+            "pos": {
+              "x": -210.9,
+              "y": -117.20000000000002
+            }
+          },
+          {
+            "id": "save-2",
+            "type": "save",
+            "params": {
+              "mode": "propose"
+            },
+            "pos": {
+              "x": 208.7,
+              "y": 70
+            }
+          },
+          {
+            "id": "notify-3",
+            "type": "notify",
+            "params": {
+              "kind": "transient",
+              "message": "{{count}} embedded"
+            },
+            "pos": {
+              "x": 494.1,
+              "y": 36.8
+            }
+          },
+          {
+            "id": "siglip.predict-4",
+            "type": "siglip.predict",
+            "params": {
+              "threshold": 0.55
+            },
+            "pos": {
+              "x": -103.54999999999995,
+              "y": 84.6
+            }
+          }
+        ],
+        "edges": [
+          {
+            "source": "source-0",
+            "target": "embed-1"
+          },
+          {
+            "source": "save-2",
+            "target": "notify-3"
+          },
+          {
+            "source": "embed-1",
+            "target": "siglip.predict-4"
+          },
+          {
+            "source": "siglip.predict-4",
+            "target": "save-2"
+          }
+        ]
+      }
+    }
+  ],
+  "device": "cuda",
+  "assistant": {
+    "enabled": true,
+    "url": "http://localhost:11434",
+    "model": "fredrezones55/Gemma-4-Uncensored-HauhauCS-Aggressive:latest",
+    "vision_model": "fredrezones55/Gemma-4-Uncensored-HauhauCS-Aggressive:latest",
+    "max_tool_calls": 8
+  }
+}

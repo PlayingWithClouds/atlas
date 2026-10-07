@@ -1,0 +1,24 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "atlas",
+    },
+    "plugins/veil": {
+      "name": "@atlas/plugin-veil",
+      "dependencies": {
+        "@atlas/plugin-sdk": "workspace:*",
+      },
+    },
+    "sdk/ts": {
+      "name": "@atlas/plugin-sdk",
+      "version": "0.1.0",
+    },
+  },
+  "packages": {
+    "@atlas/plugin-sdk": ["@atlas/plugin-sdk@workspace:sdk/ts"],
+
+    "@atlas/plugin-veil": ["@atlas/plugin-veil@workspace:plugins/veil"],
+  }
+}

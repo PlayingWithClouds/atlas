@@ -1,0 +1,9 @@
+{
+  "title": "atlas",
+  "primitives": ["tag"],
+  "labels": {
+    "groups": []
+  },
+  "plugins": [],
+  "workflows": []
+}

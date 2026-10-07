@@ -1,0 +1,135 @@
+# Launch the whole atlas stack locally (run from the repo root):
+#
+#   process-compose up          # TUI with per-process logs
+#   process-compose up -t=false # plain, no TUI
+#
+# The Go backend runs under `air` (live reload). Ordering is handled by readiness
+# probes: surreal + the three plugins come up first, then the backend, then web.
+# Open http://localhost:5173.
+#
+# Set ATLAS_WORKSPACE to run against a workspace directory (create one with
+# `go run ./backend init <dir>`); every process inherits it, so the config, database
+# and vector pools all come from there. Unset means legacy paths.
+version: "0.5"
+
+processes:
+  surreal:
+    # The database belongs to the workspace when there is one; .data is legacy mode.
+    command: "sh -c 'DB=${ATLAS_WORKSPACE:+$ATLAS_WORKSPACE/db}; DB=${DB:-.data}; mkdir -p \"$DB\" && exec surreal start --user root --pass root --bind 127.0.0.1:8020 surrealkv://\"$DB\"/atlas.db'"
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 8020
+        path: /version
+      initial_delay_seconds: 1
+      period_seconds: 1
+      timeout_seconds: 2
+      failure_threshold: 30
+
+  veil:
+    command: "bun run plugins/veil/index.ts"
+    environment:
+      - "VEIL_URL=https://api.veil.localhost:45417"
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 9101
+        path: /health
+      initial_delay_seconds: 1
+      period_seconds: 1
+      timeout_seconds: 2
+      failure_threshold: 30
+
+  fs:
+    command: "go run ./plugins/fs"
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 9102
+        path: /health
+      initial_delay_seconds: 1
+      period_seconds: 1
+      timeout_seconds: 2
+      failure_threshold: 30
+
+  model:
+    command: "plugins/model/.venv/bin/uvicorn plugins.model.main:app --port 9301"
+    # First run loads torch (and may download JoyTag weights) — give it time.
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 9301
+        path: /health
+      initial_delay_seconds: 3
+      period_seconds: 2
+      timeout_seconds: 2
+      failure_threshold: 90
+
+  joytag:
+    # Shares the model plugin's venv (same torch/fastapi dependency set) and
+    # its ~/.cache/atlas/joytag weights, so nothing is downloaded twice.
+    command: "plugins/model/.venv/bin/uvicorn plugins.joytag.main:app --port 9302"
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 9302
+        path: /health
+      initial_delay_seconds: 3
+      period_seconds: 2
+      timeout_seconds: 2
+      failure_threshold: 90
+
+  siglip:
+    # Second instance of the model plugin: SigLIP backbone for temporal video clips.
+    # Same code + venv as `model`, distinct id/pool/nodes via env. Weights (~1.7GB)
+    # download to the HF cache on the first embed call, not at startup.
+    command: "plugins/model/.venv/bin/uvicorn plugins.model.main:app --port 9303"
+    environment:
+      - "MODEL_ID=siglip"
+      - "MODEL_BACKBONE=siglip"
+      - "NODE_PREFIX=siglip."
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 9303
+        path: /health
+      initial_delay_seconds: 3
+      period_seconds: 2
+      timeout_seconds: 2
+      failure_threshold: 90
+
+  backend:
+    command: "air"
+    working_dir: "backend"
+    environment:
+      # One log line per request (status, bytes, duration, Range, client-gone).
+      - "ATLAS_ACCESS_LOG=1"
+    depends_on:
+      surreal:
+        condition: process_healthy
+      veil:
+        condition: process_healthy
+      fs:
+        condition: process_healthy
+      model:
+        condition: process_healthy
+      joytag:
+        condition: process_healthy
+      siglip:
+        condition: process_healthy
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 8123
+        path: /api/health
+      initial_delay_seconds: 1
+      period_seconds: 1
+      timeout_seconds: 2
+      failure_threshold: 30
+
+  web:
+    command: "bun run dev --host --port 5173"
+    working_dir: "web"
+    depends_on:
+      backend:
+        condition: process_healthy

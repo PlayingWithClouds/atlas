@@ -1,0 +1,26 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+node_modules/
+dist/
+.atlas/
+examples/
+dataset/
+/export/
+.svelte-kit/
+build/
+
+# VLM models (removed) / large binaries
+models/
+*.gguf
+
+# Go
+/backend/atlas
+/backend/tmp/
+*.test
+
+# SurrealDB local data
+.data/
+*.db/
+surreal.log
