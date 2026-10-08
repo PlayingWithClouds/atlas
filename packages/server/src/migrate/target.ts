@@ -7,6 +7,7 @@ const REPOSITORY_ROOT = path.resolve(import.meta.dir, "../../../..");
 
 const ENABLED_PLUGIN_DIRECTORIES = [
   "plugins/core-nodes",
+  "plugins/model-nodes",
   "plugins/primitive-tag",
   "plugins/media-image",
   "plugins/media-video",
@@ -76,8 +77,15 @@ function readPackageName(pluginDirectory: string): string | undefined {
   return JSON.parse(fs.readFileSync(manifestPath, "utf8")).name;
 }
 
-export function buildPluginEntries(veilDirectory: string, warnings: string[]): PluginEntry[] {
-  const directories = ENABLED_PLUGIN_DIRECTORIES.map((relative) => path.join(REPOSITORY_ROOT, relative));
+/** Only enabled when migrated workflows use a joytag node; it also needs a class mapping the user supplies. */
+const TAGGER_JOYTAG_DIRECTORY = "plugins/tagger-joytag";
+
+export function buildPluginEntries(veilDirectory: string, warnings: string[], includeTaggerJoytag = false): PluginEntry[] {
+  const relativeDirectories = [...ENABLED_PLUGIN_DIRECTORIES];
+  if (includeTaggerJoytag) {
+    relativeDirectories.push(TAGGER_JOYTAG_DIRECTORY);
+  }
+  const directories = relativeDirectories.map((relative) => path.join(REPOSITORY_ROOT, relative));
   directories.push(veilDirectory);
   const entries: PluginEntry[] = [];
   for (const directory of directories) {

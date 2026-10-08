@@ -2,7 +2,8 @@
 
     python -m atlas_ml.worker --module <module> [--cache-root DIR] [--device cpu|cuda]
 
-The module must expose `create_encoder(device: str) -> Encoder`. One JSON object per line
+The module must expose `create_encoder(device: str) -> Encoder` (the full model service) or
+`create_tagger(device: str) -> Tagger` (serves only `tag`). One JSON object per line
 on stdin, one response per line on stdout. Everything else (logging included) goes to
 stderr, because stdout is the protocol channel.
 """
@@ -18,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from atlas_ml.log import log
 from atlas_ml.service import ModelService
+from atlas_ml.tagger import TaggerService
 
 PARSE_ERROR = -32700
 INVALID_REQUEST = -32600
@@ -29,6 +31,7 @@ SERVICE_METHODS = {
     "embed", "forget", "train", "predict", "rank", "duplicates", "cluster",
     "similarity", "search", "insights", "status", "poolDump",
 }
+TAGGER_METHODS = {"tag"}
 REQUEST_THREADS = 16
 
 
@@ -55,7 +58,7 @@ class Worker:
         self.module_name = module_name
         self.cache_root = cache_root
         self.device = device
-        self.service: ModelService | None = None
+        self.service: ModelService | TaggerService | None = None
         self.load_error: Exception | None = None
         self.ready = threading.Event()
         self.output_lock = threading.Lock()
@@ -69,24 +72,32 @@ class Worker:
     def load_service(self) -> None:
         try:
             module = importlib.import_module(self.module_name)
-            encoder = module.create_encoder(self.device)
-            self.service = ModelService(encoder, self.cache_root, device=self.device)
+            self.service = self.build_service(module)
         except Exception as error:
-            log(f"failed to load encoder module {self.module_name}: {error}")
+            log(f"failed to load module {self.module_name}: {error}")
             self.load_error = error
         finally:
             self.ready.set()
 
-    def loaded_service(self) -> ModelService:
+    def build_service(self, module) -> ModelService | TaggerService:
+        if hasattr(module, "create_tagger"):
+            return TaggerService(module.create_tagger(self.device))
+        encoder = module.create_encoder(self.device)
+        return ModelService(encoder, self.cache_root, device=self.device)
+
+    def loaded_service(self) -> ModelService | TaggerService:
         self.ready.wait()
         if self.service is None:
-            raise RpcError(SERVER_ERROR, f"encoder failed to load: {self.load_error}")
+            raise RpcError(SERVER_ERROR, f"module failed to load: {self.load_error}")
         return self.service
 
     # --- dispatch ---------------------------------------------------------------------
 
     def describe(self) -> dict:
-        encoder = self.loaded_service().encoder
+        service = self.loaded_service()
+        if isinstance(service, TaggerService):
+            return service.describe()
+        encoder = service.encoder
         return {
             "id": encoder.id,
             "dim": encoder.dim,
@@ -99,9 +110,11 @@ class Worker:
             return "pong"
         if method == "describe":
             return self.describe()
-        if method not in SERVICE_METHODS:
+        service = self.loaded_service()
+        served = TAGGER_METHODS if isinstance(service, TaggerService) else SERVICE_METHODS
+        if method not in served:
             raise RpcError(METHOD_NOT_FOUND, f"method not found: {method}")
-        handler = getattr(self.loaded_service(), snake_case(method))
+        handler = getattr(service, snake_case(method))
         arguments = {snake_case(name): value for name, value in params.items()}
         try:
             return handler(**arguments)

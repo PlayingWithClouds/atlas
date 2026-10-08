@@ -175,6 +175,15 @@
         "svelte": "^5.19.0",
       },
     },
+    "plugins/model-nodes": {
+      "name": "@atlas/plugin-model-nodes",
+      "version": "0.0.0",
+      "dependencies": {
+        "@atlas/contracts": "workspace:*",
+        "@atlas/server": "workspace:*",
+        "@neoworks/extension-system": "link:@neoworks/extension-system",
+      },
+    },
     "plugins/primitive-region": {
       "name": "@atlas/plugin-primitive-region",
       "version": "0.0.0",
@@ -217,6 +226,15 @@
         "svelte": "^5.19.0",
       },
     },
+    "plugins/tagger-joytag": {
+      "name": "@atlas/plugin-tagger-joytag",
+      "version": "0.0.0",
+      "dependencies": {
+        "@atlas/contracts": "workspace:*",
+        "@atlas/server": "workspace:*",
+        "@neoworks/extension-system": "link:@neoworks/extension-system",
+      },
+    },
     "sdk/ts": {
       "name": "@atlas/plugin-sdk",
       "version": "0.1.0",
@@ -247,6 +265,8 @@
 
     "@atlas/plugin-media-video": ["@atlas/plugin-media-video@workspace:plugins/media-video"],
 
+    "@atlas/plugin-model-nodes": ["@atlas/plugin-model-nodes@workspace:plugins/model-nodes"],
+
     "@atlas/plugin-primitive-region": ["@atlas/plugin-primitive-region@workspace:plugins/primitive-region"],
 
     "@atlas/plugin-primitive-tag": ["@atlas/plugin-primitive-tag@workspace:plugins/primitive-tag"],
@@ -254,6 +274,8 @@
     "@atlas/plugin-sdk": ["@atlas/plugin-sdk@workspace:sdk/ts"],
 
     "@atlas/plugin-source-fs": ["@atlas/plugin-source-fs@workspace:plugins/source-fs"],
+
+    "@atlas/plugin-tagger-joytag": ["@atlas/plugin-tagger-joytag@workspace:plugins/tagger-joytag"],
 
     "@atlas/server": ["@atlas/server@workspace:packages/server"],
 

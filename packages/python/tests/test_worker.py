@@ -11,10 +11,12 @@ from conftest import PACKAGE_ROOT
 
 
 class WorkerProcess:
-    def __init__(self, cache_root: str):
-        environment = dict(os.environ, PYTHONPATH=PACKAGE_ROOT)
+    def __init__(self, cache_root: str, module: str = "atlas_ml.testing",
+                 extra_paths: tuple[str, ...] = ()):
+        python_path = os.pathsep.join([PACKAGE_ROOT, *extra_paths])
+        environment = dict(os.environ, PYTHONPATH=python_path)
         self.process = subprocess.Popen(
-            [sys.executable, "-m", "atlas_ml.worker", "--module", "atlas_ml.testing",
+            [sys.executable, "-m", "atlas_ml.worker", "--module", module,
              "--cache-root", cache_root],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, env=environment,

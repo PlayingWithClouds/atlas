@@ -317,12 +317,56 @@ export function itemMeta(session: OldSession, mapped: MappedItemRef): JsonRecord
 
 type OldWorkflowNode = { id: string; type: string; params?: JsonRecord; pos?: { x: number; y: number } };
 
+export const JOYTAG_NODE_TYPE = "joytag-tag";
+
+/** Old node types whose new counterpart has a different name; every other type keeps its name. */
+const NODE_TYPE_MAP: Record<string, string> = {
+  source: "session-items",
+  embed: "embed",
+  predict: "predict",
+  dedupe: "dedupe",
+  cluster: "cluster",
+  propagate: "propagate",
+  "siglip.embed": "embed",
+  "siglip.predict": "predict",
+  "siglip.dedupe": "dedupe",
+  "siglip.cluster": "cluster",
+  "siglip.propagate": "propagate",
+  segment: "segment",
+  quality: "quality",
+  trim: "trim",
+  extract: "extract-frames",
+  "node.tag": JOYTAG_NODE_TYPE,
+  joytag: JOYTAG_NODE_TYPE,
+};
+
+/** Old model plugins prefixed their nodes (NODE_PREFIX, e.g. "siglip."); the generic nodes carry no encoder name. */
+const PREFIXED_MODEL_NODES = ["embed", "predict", "dedupe", "cluster", "propagate"];
+
+export function mapNodeType(oldType: string): string {
+  const mapped = NODE_TYPE_MAP[oldType];
+  if (mapped !== undefined) {
+    return mapped;
+  }
+  const baseName = oldType.slice(oldType.lastIndexOf(".") + 1);
+  if (oldType.includes(".") && PREFIXED_MODEL_NODES.includes(baseName)) {
+    return baseName;
+  }
+  return oldType;
+}
+
 function mapNode(node: OldWorkflowNode): WorkflowNode {
   const position = node.pos === undefined ? { x: 0, y: 0 } : node.pos;
+  const type = mapNodeType(node.type);
   if (node.params === undefined) {
-    return { id: node.id, type: node.type, position };
+    return { id: node.id, type, position };
   }
-  return { id: node.id, type: node.type, params: node.params, position };
+  return { id: node.id, type, params: node.params, position };
+}
+
+/** True when any mapped workflow needs the optional JoyTag tagger plugin. */
+export function usesJoytagNode(workflows: Workflow[]): boolean {
+  return workflows.some((workflow) => workflow.graph.nodes.some((node) => node.type === JOYTAG_NODE_TYPE));
 }
 
 function mapTriggers(workflow: OldWorkflow): string[] {
