@@ -1,7 +1,0 @@
-#V2
-CREATE type::record('job','recov1') SET type='embed', session_id='s1', state='running', done=0, total=5, phase='', error='', extra={}, created=1.0, updated=1.0;
-DELETE job;
-CREATE notification SET message="test", session="s", level="info", created=time::now();
-SELECT type::string(id) AS id, message, session, level, type::string(created) AS created FROM notification ORDER BY created;
-DELETE notification;
-SELECT count() FROM notification GROUP ALL;

@@ -1,0 +1,8 @@
+numpy
+pillow
+requests
+torch
+torchvision
+safetensors
+einops
+transformers

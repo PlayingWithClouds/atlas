@@ -4,7 +4,7 @@ You're allowed to use git. Every time you make a big change, commit the current 
 
 ## Style
 
-The design system lives in `web/src/lib/design/app.css`, with reusable components in `web/src/lib/components/`. When creating new components, try to reuse existing ones as much as possible, and if you need to create new ones, follow the design system guidelines.
+The design system lives in `packages/web/src/lib/design/app.css`, with reusable components in `packages/web/src/lib/components/` (exported to plugins as `@atlas/web/components`). When creating new components, try to reuse existing ones as much as possible, and if you need to create new ones, follow the design system guidelines.
 
 ## Code Style
 

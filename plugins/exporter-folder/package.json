@@ -1,0 +1,22 @@
+{
+  "name": "@atlas/plugin-exporter-folder",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "atlas": {
+    "server": "./src/server.ts",
+    "web": "./src/web.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@atlas/contracts": "workspace:*",
+    "@atlas/server": "workspace:*",
+    "@atlas/web": "workspace:*",
+    "@neoworks/extension-system": "link:@neoworks/extension-system"
+  },
+  "devDependencies": {
+    "svelte": "^5.19.0"
+  }
+}
