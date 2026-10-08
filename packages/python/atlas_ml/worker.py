@@ -1,6 +1,6 @@
 """JSON-RPC 2.0 worker over stdio.
 
-    python -m atlas_ml.worker --module <module> [--cache-root DIR] [--device cpu|cuda]
+    python -m atlas_ml.worker --module <module> [--cache-root DIR] [--device auto|cpu|cuda]
 
 The module must expose `create_encoder(device: str) -> Encoder` (the full model service) or
 `create_tagger(device: str) -> Tagger` (serves only `tag`). One JSON object per line
@@ -32,7 +32,10 @@ SERVICE_METHODS = {
     "similarity", "search", "insights", "status", "poolDump",
 }
 TAGGER_METHODS = {"tag"}
-REQUEST_THREADS = 16
+# Long calls get their own pool so a backlog of embeds cannot starve status/rank/search.
+HEAVY_METHODS = {"embed", "insights", "tag"}
+HEAVY_THREADS = 8
+LIGHT_THREADS = 8
 
 
 class RpcError(Exception):
@@ -62,7 +65,8 @@ class Worker:
         self.load_error: Exception | None = None
         self.ready = threading.Event()
         self.output_lock = threading.Lock()
-        self.executor = ThreadPoolExecutor(max_workers=REQUEST_THREADS)
+        self.heavy_executor = ThreadPoolExecutor(max_workers=HEAVY_THREADS)
+        self.light_executor = ThreadPoolExecutor(max_workers=LIGHT_THREADS)
 
     # --- startup ----------------------------------------------------------------------
 
@@ -158,7 +162,12 @@ class Worker:
         if not isinstance(request, dict) or "method" not in request:
             self.write(self.error_response(None, INVALID_REQUEST, "invalid request"))
             return
-        self.executor.submit(self.handle_request, request)
+        self.executor_for(request["method"]).submit(self.handle_request, request)
+
+    def executor_for(self, method: str) -> ThreadPoolExecutor:
+        if method in HEAVY_METHODS:
+            return self.heavy_executor
+        return self.light_executor
 
     # --- lifecycle --------------------------------------------------------------------
 
@@ -170,7 +179,8 @@ class Worker:
         self.shutdown()
 
     def shutdown(self) -> None:
-        self.executor.shutdown(wait=True)
+        self.heavy_executor.shutdown(wait=True)
+        self.light_executor.shutdown(wait=True)
         if self.service is not None:
             self.service.close()
 
@@ -179,13 +189,26 @@ def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="atlas_ml.worker")
     parser.add_argument("--module", required=True)
     parser.add_argument("--cache-root", default=os.path.expanduser("~/.cache/atlas"))
-    parser.add_argument("--device", default="cpu", choices=["cpu", "cuda"])
+    parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     return parser.parse_args(argv)
+
+
+def resolve_device(requested: str) -> str:
+    """`auto` picks CUDA when torch can see a GPU; encoders on CPU are an order of magnitude slower."""
+    if requested != "auto":
+        return requested
+    try:
+        import torch
+    except ImportError:
+        return "cpu"
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
 
 
 def main(argv: list[str] | None = None) -> int:
     arguments = parse_arguments(argv)
-    worker = Worker(arguments.module, arguments.cache_root, arguments.device)
+    worker = Worker(arguments.module, arguments.cache_root, resolve_device(arguments.device))
     worker.serve()
     return 0
 

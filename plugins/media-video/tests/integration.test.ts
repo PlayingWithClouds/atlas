@@ -222,6 +222,15 @@ describe.skipIf(!ffmpegAvailable)("with ffmpeg", () => {
     expect(embedCalls.length).toBe(embedCount);
   });
 
+  test("re-segmenting embeds clips an interrupted run left unembedded", async () => {
+    await runNode("segment", { mode: "fixed", window: 2, stride: 2 }, [videoItem]);
+    host.context.items.setEmbedded(clipsOf().map((clip) => clip.id), false);
+
+    await runNode("segment", { mode: "fixed", window: 2, stride: 2 }, [videoItem]);
+    expect(clipsOf().length).toBe(3);
+    expect(clipsOf().every((clip) => clip.embedded)).toBe(true);
+  });
+
   test("re-segmenting with new settings drops unlabeled clips and keeps labeled ones", async () => {
     await runNode("segment", { mode: "fixed", window: 2, stride: 2 }, [videoItem]);
     const labeled = clipsOf()[1];

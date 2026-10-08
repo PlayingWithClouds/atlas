@@ -64,6 +64,8 @@ export class HttpCore extends Service implements HttpService {
     const port = options.port === undefined ? DEFAULT_PORT : options.port;
     this.server = Bun.serve({
       port,
+      // Bun drops requests idle for 10s by default; embedding and training routes legitimately take longer.
+      idleTimeout: 0,
       fetch: (request, server) => this.handleRequest(request, server),
       websocket: {
         open: (socket) => this.webSocketHooks?.open(socket),

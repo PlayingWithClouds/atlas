@@ -141,6 +141,8 @@ export class ItemsCore extends Service implements ItemsService {
   constructor(ctx: Context) {
     super(ctx, "items");
     ctx.db.migrate("items", [{ version: 1, sql: ITEMS_MIGRATION }]);
+    // Producers die with the process; a flag left set would keep sessions "waiting" forever.
+    ctx.db.database.query("UPDATE sessions SET producing = 0 WHERE producing = 1").run();
     this.ctx.effect(() => this.ctx.live.provideState("sessions", () => this.summaries()), "items:state");
   }
 

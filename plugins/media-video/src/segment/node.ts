@@ -132,13 +132,13 @@ function appendClips(ctx: Context, session: Session, videoItem: Item, spans: Spa
   return ctx.items.append(session.id, newItems);
 }
 
-function plannedWorkItems(ctx: Context, sessionId: string, spans: SpanPlan[]): WorkItem[] {
+function plannedClips(ctx: Context, sessionId: string, spans: SpanPlan[]): Item[] {
   const byRef = new Map(ctx.items.list(sessionId).map((item) => [item.ref, item]));
-  const planned: WorkItem[] = [];
+  const planned: Item[] = [];
   for (const span of spans) {
     const item = byRef.get(span.ref);
     if (item !== undefined) {
-      planned.push(toWorkItem(item));
+      planned.push(item);
     }
   }
   return planned;
@@ -178,13 +178,17 @@ async function segmentVideo(environment: SegmentEnvironment, video: Item, settin
   const created = appendClips(ctx, context.session, video, plan.spans);
   if (created.length > 0) {
     await cutPosters(environment, created);
-    await embedClips(environment, created, plan.embeddedRefs);
+  }
+  // Includes clips an interrupted earlier run appended but never embedded.
+  const unembedded = plannedClips(ctx, context.session.id, plan.spans).filter((clip) => !clip.embedded);
+  if (unembedded.length > 0) {
+    await embedClips(environment, unembedded, plan.embeddedRefs);
   }
   if (plan.spans.length > 0) {
     retireContainer(ctx, video);
   }
   await finishSegmenting(environment, plan, created.length);
-  return plannedWorkItems(ctx, context.session.id, plan.spans);
+  return plannedClips(ctx, context.session.id, plan.spans).map(toWorkItem);
 }
 
 /** Spanned items pass through untouched; whole videos are replaced by their clips. */
