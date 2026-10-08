@@ -93,14 +93,41 @@
         "@neoworks/extension-system": "link:@neoworks/extension-system",
       },
     },
+    "plugins/exporter-folder": {
+      "name": "@atlas/plugin-exporter-folder",
+      "version": "0.0.0",
+      "dependencies": {
+        "@atlas/contracts": "workspace:*",
+        "@atlas/server": "workspace:*",
+        "@atlas/web": "workspace:*",
+        "@neoworks/extension-system": "link:@neoworks/extension-system",
+      },
+      "devDependencies": {
+        "svelte": "^5.19.0",
+      },
+    },
     "plugins/media-image": {
       "name": "@atlas/plugin-media-image",
       "version": "0.0.0",
       "dependencies": {
         "@atlas/contracts": "workspace:*",
         "@atlas/server": "workspace:*",
+        "@atlas/web": "workspace:*",
         "@neoworks/extension-system": "link:@neoworks/extension-system",
+        "phosphor-svelte": "^3.0.0",
         "sharp": "^0.34.0",
+      },
+      "devDependencies": {
+        "svelte": "^5.19.0",
+      },
+    },
+    "plugins/media-video": {
+      "name": "@atlas/plugin-media-video",
+      "version": "0.0.0",
+      "dependencies": {
+        "@atlas/contracts": "workspace:*",
+        "@atlas/server": "workspace:*",
+        "@neoworks/extension-system": "link:@neoworks/extension-system",
       },
     },
     "plugins/primitive-region": {
@@ -109,7 +136,12 @@
       "dependencies": {
         "@atlas/contracts": "workspace:*",
         "@atlas/server": "workspace:*",
+        "@atlas/web": "workspace:*",
         "@neoworks/extension-system": "link:@neoworks/extension-system",
+        "phosphor-svelte": "^3.0.0",
+      },
+      "devDependencies": {
+        "svelte": "^5.19.0",
       },
     },
     "plugins/primitive-tag": {
@@ -118,7 +150,12 @@
       "dependencies": {
         "@atlas/contracts": "workspace:*",
         "@atlas/server": "workspace:*",
+        "@atlas/web": "workspace:*",
         "@neoworks/extension-system": "link:@neoworks/extension-system",
+        "phosphor-svelte": "^3.0.0",
+      },
+      "devDependencies": {
+        "svelte": "^5.19.0",
       },
     },
     "plugins/source-fs": {
@@ -127,13 +164,12 @@
       "dependencies": {
         "@atlas/contracts": "workspace:*",
         "@atlas/server": "workspace:*",
+        "@atlas/web": "workspace:*",
         "@neoworks/extension-system": "link:@neoworks/extension-system",
+        "phosphor-svelte": "^3.0.0",
       },
-    },
-    "plugins/veil": {
-      "name": "@atlas/plugin-veil",
-      "dependencies": {
-        "@atlas/plugin-sdk": "workspace:*",
+      "devDependencies": {
+        "svelte": "^5.19.0",
       },
     },
     "sdk/ts": {
@@ -152,7 +188,11 @@
 
     "@atlas/plugin-encoder-siglip": ["@atlas/plugin-encoder-siglip@workspace:plugins/encoder-siglip"],
 
+    "@atlas/plugin-exporter-folder": ["@atlas/plugin-exporter-folder@workspace:plugins/exporter-folder"],
+
     "@atlas/plugin-media-image": ["@atlas/plugin-media-image@workspace:plugins/media-image"],
+
+    "@atlas/plugin-media-video": ["@atlas/plugin-media-video@workspace:plugins/media-video"],
 
     "@atlas/plugin-primitive-region": ["@atlas/plugin-primitive-region@workspace:plugins/primitive-region"],
 
@@ -161,8 +201,6 @@
     "@atlas/plugin-sdk": ["@atlas/plugin-sdk@workspace:sdk/ts"],
 
     "@atlas/plugin-source-fs": ["@atlas/plugin-source-fs@workspace:plugins/source-fs"],
-
-    "@atlas/plugin-veil": ["@atlas/plugin-veil@workspace:plugins/veil"],
 
     "@atlas/server": ["@atlas/server@workspace:packages/server"],
 
