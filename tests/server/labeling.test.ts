@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { fakeModel, fakePrimitive, mountProviders, projectConfig } from "./fakes";
+import { fakeModel, fakePrimitive, fakeSource, mountProviders, projectConfig } from "./fakes";
 import type { FakeModelState } from "./fakes";
 import { startHost } from "./helpers";
 
@@ -91,5 +91,35 @@ test("backfill trains all labeled items; suggestions come from predict", async (
     { ref: "b", labels: ["b"] },
   ]);
   expect(await host.context.labeling.suggestions(items[0])).toEqual({ a: 0.9 });
+  await host.stop();
+});
+
+test("confirm embeds an unembedded item before training and marks it embedded", async () => {
+  const calls: string[] = [];
+  const model = fakeModel(
+    { trained: [], failTraining: false, rankOrder: [], forgotten: [], predictions: {} },
+    {
+      embed: async (_projectId, descriptors) => {
+        calls.push(`embed:${descriptors.map((descriptor) => descriptor.ref).join(",")}`);
+        return { embedded: descriptors.map((descriptor) => descriptor.ref) };
+      },
+      train: async (_projectId, labeled) => {
+        calls.push("train");
+        return { poolSize: labeled.length };
+      },
+    },
+  );
+  const host = await startHost();
+  await mountProviders(host, { model, primitive: fakePrimitive, source: fakeSource() });
+  const project = host.context.projects.create("p", projectConfig());
+  const session = host.context.items.createSession({
+    projectId: project.id,
+    label: "s",
+    source: { plugin: "fake-source", kind: "list", params: {} },
+  });
+  const [item] = host.context.items.append(session.id, [{ ref: "ref-0", mediaKind: "fake-media" }]);
+  await host.context.labeling.confirm(item.id, [{ type: "fake-tag", value: { classes: ["a"] } }]);
+  expect(calls).toEqual(["embed:ref-0", "train"]);
+  expect(host.context.items.get(item.id)?.embedded).toBe(true);
   await host.stop();
 });
