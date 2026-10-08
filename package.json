@@ -2,7 +2,15 @@
   "name": "atlas",
   "private": true,
   "workspaces": [
-    "sdk/ts",
-    "plugins/veil"
-  ]
+    "packages/*",
+    "plugins/*",
+    "sdk/ts"
+  ],
+  "dependencies": {
+    "@neoworks/extension-system": "link:@neoworks/extension-system"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "typescript": "^7.0.2"
+  }
 }
