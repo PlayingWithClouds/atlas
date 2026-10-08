@@ -24,3 +24,7 @@ models/
 .data/
 *.db/
 surreal.log
+
+# rewrite
+packages/*/node_modules/
+.atlas-workspace/

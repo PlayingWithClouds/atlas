@@ -1,0 +1,24 @@
+{
+  "name": "@atlas/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./web": "./src/web.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@neoworks/extension-system": "link:@neoworks/extension-system"
+  },
+  "peerDependencies": {
+    "svelte": "^5.19.0"
+  },
+  "devDependencies": {
+    "svelte": "^5.56.4",
+    "typescript": "^5.9.3"
+  }
+}
