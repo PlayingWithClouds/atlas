@@ -102,6 +102,17 @@ export interface SessionStatus {
   poolSize: number;
 }
 
+/** Compact per-session row for lists and the live `sessions` state slice. */
+export interface SessionSummary {
+  id: string;
+  label: string;
+  projectId: string;
+  producing: boolean;
+  total: number;
+  labeled: number;
+  skipped: number;
+}
+
 export type JobState = "running" | "done" | "error" | "interrupted";
 
 export interface JobView {

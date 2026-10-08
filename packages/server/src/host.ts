@@ -1,11 +1,19 @@
 import { Context } from "@neoworks/extension-system";
 import type { Fiber } from "@neoworks/extension-system";
 import DbCore from "./services/db";
+import DomainRoutes from "./services/domainRoutes";
 import HttpCore from "./services/http";
 import JobsCore from "./services/jobs";
+import ItemsCore from "./services/items";
+import LabelingCore from "./services/labeling";
 import LiveCore from "./services/live";
+import MediaKindsCore from "./services/mediaKinds";
+import ModelsCore from "./services/models";
 import NotificationsCore from "./services/notifications";
 import PluginsCore from "./services/plugins";
+import PrimitivesCore from "./services/primitives";
+import ProjectsCore from "./services/projects";
+import SourcesCore from "./services/sources";
 import WorkspaceCore from "./services/workspace";
 
 export interface HostOptions {
@@ -34,6 +42,14 @@ async function mountCoreServices(context: Context, options: HostOptions, mounted
     [LiveCore, undefined],
     [JobsCore, undefined],
     [NotificationsCore, undefined],
+    [ProjectsCore, undefined],
+    [MediaKindsCore, undefined],
+    [PrimitivesCore, undefined],
+    [ModelsCore, undefined],
+    [ItemsCore, undefined],
+    [SourcesCore, undefined],
+    [LabelingCore, undefined],
+    [DomainRoutes, undefined],
     // TODO(main thread): mount the python worker service (src/python/service.ts default export) here.
     [PluginsCore, undefined],
   ];

@@ -23,6 +23,7 @@ import type {
   ProjectConfig,
   Session,
   SessionStatus,
+  SessionSummary,
   SourceRef,
   Span,
   TriggerSpec,
@@ -160,7 +161,9 @@ export interface ItemsService {
   listSessions(projectId?: string): Session[];
   updateSession(sessionId: string, patch: Partial<Pick<Session, "label" | "producing" | "meta">>): Session;
   removeSession(sessionId: string): void;
-  status(sessionId: string): SessionStatus;
+  /** Async because the model provider is asked for training state. */
+  status(sessionId: string): Promise<SessionStatus>;
+  summaries(projectId?: string): SessionSummary[];
 
   /** Appends with idx = max + 1; refs already in the session are skipped. Returns the new items. */
   append(sessionId: string, items: NewItem[]): Item[];
