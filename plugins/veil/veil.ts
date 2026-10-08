@@ -55,22 +55,43 @@ export async function listGalleries(search: string, limit: number, offset: numbe
   return data.galleries;
 }
 
+const GALLERY_FIELDS = "id title images{ filePath position }";
+
 export async function galleryImageUrls(galleryId: string): Promise<{ title: string; urls: string[] }> {
   const query = `
     query($id:ID!){
-      gallery(id:$id){ id title images{ filePath position } }
+      gallery(id:$id){ ${GALLERY_FIELDS} }
     }
   `;
-  const data = await graphql(query, { id: galleryId });
-  const gallery = data.gallery;
+  let gallery = (await graphql(query, { id: galleryId })).gallery;
   if (gallery === null) {
     throw new Error("gallery not found");
+  }
+  if (gallery.images.length === 0) {
+    gallery = await ensureGalleryImages(galleryId);
   }
   const images = [...gallery.images].sort(
     (a: any, b: any) => (a.position || 0) - (b.position || 0),
   );
   const urls = images.map((image: any) => image.filePath).filter((path: string) => Boolean(path));
   return { title: gallery.title, urls };
+}
+
+/**
+ * Galleries found through search/browse are stubs without images; veil scrapes
+ * the origin page on demand. A failed scrape still returns the stored gallery.
+ */
+async function ensureGalleryImages(galleryId: string): Promise<any> {
+  const mutation = `
+    mutation($id:ID!){
+      ensureGalleryImages(galleryId:$id){ ${GALLERY_FIELDS} }
+    }
+  `;
+  const gallery = (await graphql(mutation, { id: galleryId })).ensureGalleryImages;
+  if (gallery === null) {
+    throw new Error("gallery not found");
+  }
+  return gallery;
 }
 
 export interface Scene {

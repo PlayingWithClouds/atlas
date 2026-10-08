@@ -51,7 +51,7 @@ tasks:
   up:
     desc: Launch the whole stack via process-compose (backend under air live-reload)
     cmds:
-      - process-compose up
+      - process-compose up -U
 
   backend:
     desc: Run the Go backend on :8123 (live-reload via air)
