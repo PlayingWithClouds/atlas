@@ -80,3 +80,14 @@ test("compact renumbers idx to 0..n-1 in order and later appends continue after 
   expect(items.list(session.id).map((item) => item.index)).toEqual([0, 1, 2, 3]);
   await host.stop();
 });
+
+test("boot clears producing flags left by a previous process", async () => {
+  const { host, items, session } = await setup();
+  items.updateSession(session.id, { producing: true });
+  const workspaceDirectory = host.context.workspace.directory;
+  await host.stop();
+
+  const restarted = await startHost(workspaceDirectory);
+  expect(restarted.context.items.getSession(session.id)?.producing).toBe(false);
+  await restarted.stop();
+});

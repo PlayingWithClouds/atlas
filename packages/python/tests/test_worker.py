@@ -112,3 +112,20 @@ def test_stdout_carries_only_protocol_lines(worker):
     remaining = worker.process.stdout.read()
     worker.process.wait(timeout=20)
     assert remaining == ""
+
+
+def test_light_calls_are_not_queued_behind_heavy_ones():
+    from atlas_ml.worker import HEAVY_METHODS, Worker
+
+    worker = Worker("atlas_ml.testing", "/tmp", "cpu")
+    assert "embed" in HEAVY_METHODS
+    assert worker.executor_for("embed") is worker.heavy_executor
+    assert worker.executor_for("status") is worker.light_executor
+    assert worker.executor_for("rank") is worker.light_executor
+
+
+def test_auto_device_resolves_to_a_concrete_device():
+    from atlas_ml.worker import resolve_device
+
+    assert resolve_device("cpu") == "cpu"
+    assert resolve_device("auto") in ("cpu", "cuda")

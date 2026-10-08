@@ -18,11 +18,14 @@ import SourcesCore from "./services/sources";
 import ToolsCore from "./services/tools";
 import WorkflowsCore from "./services/workflows";
 import WorkspaceCore from "./services/workspace";
+import { exportLogsToConsole } from "./consoleLogs";
 
 export interface HostOptions {
   workspaceDirectory: string;
   /** Port 0 picks a free port; omitted means the default. */
   port?: number;
+  /** Print `ctx.logger` output (plugin failures, Python worker stderr) to stderr. */
+  logToConsole?: boolean;
 }
 
 export interface Host {
@@ -67,6 +70,9 @@ async function mountCoreServices(context: Context, options: HostOptions, mounted
 
 export async function createHost(options: HostOptions): Promise<Host> {
   const context = new Context();
+  if (options.logToConsole) {
+    exportLogsToConsole(context);
+  }
   const mounted: Fiber[] = [];
   const stop = () => disposeInReverse(mounted);
   try {

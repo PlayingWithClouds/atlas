@@ -40,7 +40,7 @@ function parseArguments(argv: string[]): CliArguments {
 }
 
 async function serve(workspaceDirectory: string, port: number | undefined): Promise<void> {
-  const host = await createHost({ workspaceDirectory, port });
+  const host = await createHost({ workspaceDirectory, port, logToConsole: true });
   console.log(`atlas serving ${workspaceDirectory} on http://localhost:${host.context.http.port}`);
   const shutdown = async () => {
     await host.stop();
