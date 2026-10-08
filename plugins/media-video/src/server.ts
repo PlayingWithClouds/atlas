@@ -16,7 +16,7 @@ export default {
   name: "media-video",
   inject: ["mediaKinds", "sources", "items", "http", "workspace", "notifications", "models", "labeling"],
   apply(ctx: Context) {
-    const tools = new FfmpegTools();
+    const tools = new FfmpegTools((message) => ctx.logger("media-video").warn(message));
     ctx.effect(() => () => tools.stop(), "ffmpeg:processes");
     const caches = new MediaCaches(ctx.workspace.pluginCacheDirectory("media-video"));
     const media = new VideoMedia({

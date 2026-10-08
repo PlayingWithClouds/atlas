@@ -16,6 +16,8 @@
  */
 
 @import 'tailwindcss';
+/* Generated per workspace by the Vite config: one @source per enabled plugin's web code. */
+@import './plugin-sources.css';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
