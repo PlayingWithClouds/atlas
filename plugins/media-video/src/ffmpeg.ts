@@ -86,9 +86,27 @@ export function tileFilterGraph(imagePaths: (string | undefined)[], tile: TileLa
   return parts.join(";");
 }
 
+/** Receives ffmpeg's error output when a call fails; failures are otherwise silent fallbacks. */
+export type FailureReporter = (message: string) => void;
+
+function lastLines(text: string): string {
+  return text.trim().split("\n").slice(-3).join(" | ");
+}
+
+/** The input URL or path, shortened: signed stream URLs run to hundreds of characters. */
+function inputOf(args: string[]): string {
+  const flagIndex = args.indexOf("-i");
+  if (flagIndex === -1 || flagIndex + 1 >= args.length) {
+    return "?";
+  }
+  return args[flagIndex + 1].slice(0, 120);
+}
+
 export class FfmpegTools implements VideoTools {
   private readonly running = new Set<ReturnType<typeof Bun.spawn>>();
   private stopped = false;
+
+  constructor(private readonly reportFailure: FailureReporter = () => {}) {}
 
   /** Kills every process still running; called when the plugin unloads. */
   stop(): void {
@@ -189,16 +207,22 @@ export class FfmpegTools implements VideoTools {
     }
     let subprocess: ReturnType<typeof Bun.spawn>;
     try {
-      subprocess = Bun.spawn([command, ...args], { stdin: "ignore", stdout: "pipe", stderr: "ignore" });
+      subprocess = Bun.spawn([command, ...args], { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
     } catch (error) {
       return { ok: false, output: new Uint8Array() };
     }
     this.running.add(subprocess);
     const timer = setTimeout(() => subprocess.kill(), timeoutMs);
     try {
-      const output = new Uint8Array(await new Response(subprocess.stdout as ReadableStream).arrayBuffer());
+      const [output, errorText] = await Promise.all([
+        new Response(subprocess.stdout as ReadableStream).arrayBuffer(),
+        new Response(subprocess.stderr as ReadableStream).text(),
+      ]);
       const exitCode = await subprocess.exited;
-      return { ok: exitCode === 0, output };
+      if (exitCode !== 0 && !this.stopped) {
+        this.reportFailure(`${command} exited with ${exitCode}: ${lastLines(errorText)} (input ${inputOf(args)})`);
+      }
+      return { ok: exitCode === 0, output: new Uint8Array(output) };
     } finally {
       clearTimeout(timer);
       this.running.delete(subprocess);
