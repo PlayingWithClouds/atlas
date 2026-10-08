@@ -248,6 +248,7 @@ describe.skipIf(!ffmpegAvailable)("with ffmpeg", () => {
     await runNode("segment", { mode: "fixed", window: 2, stride: 2 }, [videoItem]);
     const labeled = clipsOf()[1];
     await host.context.labeling.confirm(labeled.id, [{ type: "fake-tag", value: { classes: ["a"] } }]);
+    await host.context.labeling.idle();
 
     await runNode("segment", { mode: "fixed", window: 3, stride: 3 }, [videoItem]);
     const ranges = clipsOf().map((clip) => `${clip.span!.start}-${clip.span!.end}`);
@@ -282,6 +283,7 @@ describe.skipIf(!ffmpegAvailable)("with ffmpeg", () => {
       { ref: videoPath, mediaKind: "video", span: { start: 2.7, end: 6 } },
     ]);
     await host.context.labeling.confirm(second.id, [{ type: "fake-tag", value: { classes: ["b"] } }]);
+    await host.context.labeling.idle();
     modelState.trained.length = 0;
 
     const result = await runNode("trim", { tolerance: 0.6, minLen: 1, cutScore: 0.3 }, [first, second]);

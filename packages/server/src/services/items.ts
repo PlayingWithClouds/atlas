@@ -14,6 +14,7 @@ import type {
 } from "@atlas/contracts";
 import { HttpError } from "@atlas/contracts/server";
 import type { ItemsService, NewItem } from "@atlas/contracts/server";
+import { withInteractiveDeadline } from "./deadline";
 import { shortId } from "./ids";
 
 interface SessionRow {
@@ -404,12 +405,9 @@ export class ItemsCore extends Service implements ItemsService {
     if (!provider) {
       return { modelTrained: false, poolSize: 0 };
     }
-    try {
-      const state = await provider.status(project.id, classNamesOf(project.config));
-      return { modelTrained: state.trained, poolSize: state.poolSize };
-    } catch (error) {
-      return { modelTrained: false, poolSize: 0 };
-    }
+    const untrained = { trained: false, poolSize: 0 };
+    const state = await withInteractiveDeadline(provider.status(project.id, classNamesOf(project.config)), untrained);
+    return { modelTrained: state.trained, poolSize: state.poolSize };
   }
 
   private requireSession(sessionId: string): Session {

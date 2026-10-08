@@ -28,6 +28,13 @@ async function forgetInModel(ctx: Context, item: Item): Promise<void> {
   }
 }
 
+/** Fire-and-forget: the HTTP response must not wait on the model worker. */
+function forgetInBackground(ctx: Context, item: Item): void {
+  forgetInModel(ctx, item).catch(() => {
+    // forgetInModel reports provider failures itself; nothing else can be done here.
+  });
+}
+
 function parseSpan(body: Record<string, unknown>): Span {
   const start = body.start;
   const end = body.end;
@@ -43,8 +50,9 @@ function parseSpan(body: Record<string, unknown>): Span {
 async function changeSpan(ctx: Context, request: Request, itemId: string): Promise<Item> {
   const item = requireItem(ctx, itemId);
   const span = parseSpan(await readJsonObject(request));
-  await forgetInModel(ctx, item);
-  return ctx.items.setSpan(itemId, span);
+  const updated = ctx.items.setSpan(itemId, span);
+  forgetInBackground(ctx, item);
+  return updated;
 }
 
 async function describeItemForClient(ctx: Context, itemId: string) {
@@ -85,10 +93,10 @@ export function registerItemRoutes(ctx: Context): void {
     return skipped;
   });
 
-  addRoute(ctx, "DELETE", "/api/items/:id", async (_request, params) => {
+  addRoute(ctx, "DELETE", "/api/items/:id", (_request, params) => {
     const item = requireItem(ctx, params.id);
-    await forgetInModel(ctx, item);
     ctx.items.remove(params.id);
+    forgetInBackground(ctx, item);
     return { ok: true };
   });
 

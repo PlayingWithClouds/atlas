@@ -35,6 +35,7 @@ test("confirm normalizes, drops unknown primitives and nulls, and trains", async
     { type: "fake-tag", value: { drop: true } },
     { type: "unknown", value: {} },
   ]);
+  await host.context.labeling.idle();
   expect(labeled.status).toBe("labeled");
   expect(labeled.annotations).toEqual([{ type: "fake-tag", value: { classes: ["a"], normalized: true } }]);
   expect(state.trained).toEqual([[{ ref: "a", labels: ["a"] }]]);
@@ -44,6 +45,7 @@ test("confirm normalizes, drops unknown primitives and nulls, and trains", async
 test("training failure persists a notification and the item stays labeled", async () => {
   const { host, items } = await setup({ failTraining: true });
   const labeled = await host.context.labeling.confirm(items[0].id, [{ type: "fake-tag", value: { classes: ["b"] } }]);
+  await host.context.labeling.idle();
   expect(labeled.status).toBe("labeled");
   const notifications = host.context.notifications.list();
   expect(notifications).toHaveLength(1);
@@ -119,6 +121,7 @@ test("confirm embeds an unembedded item before training and marks it embedded", 
   });
   const [item] = host.context.items.append(session.id, [{ ref: "ref-0", mediaKind: "fake-media" }]);
   await host.context.labeling.confirm(item.id, [{ type: "fake-tag", value: { classes: ["a"] } }]);
+  await host.context.labeling.idle();
   expect(calls).toEqual(["embed:ref-0", "train"]);
   expect(host.context.items.get(item.id)?.embedded).toBe(true);
   await host.stop();

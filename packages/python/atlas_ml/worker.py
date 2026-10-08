@@ -22,6 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 from atlas_ml.log import log
 from atlas_ml.service import ModelService
 from atlas_ml.tagger import TaggerService
+from atlas_ml.watchdog import RequestWatchdog
 
 PARSE_ERROR = -32700
 INVALID_REQUEST = -32600
@@ -69,6 +70,7 @@ class Worker:
         self.output_lock = threading.Lock()
         self.heavy_executor = ThreadPoolExecutor(max_workers=HEAVY_THREADS)
         self.light_executor = ThreadPoolExecutor(max_workers=LIGHT_THREADS)
+        self.watchdog = RequestWatchdog(os.path.join(cache_root, "worker-stacks.log"), HEAVY_METHODS)
 
     # --- startup ----------------------------------------------------------------------
 
@@ -145,7 +147,11 @@ class Worker:
         return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
 
     def handle_request(self, request: dict) -> None:
-        response = self.build_response(request)
+        key = self.watchdog.begin(request["method"])
+        try:
+            response = self.build_response(request)
+        finally:
+            self.watchdog.end(key)
         if "id" in request:
             self.write(response)
 
@@ -175,12 +181,14 @@ class Worker:
 
     def serve(self) -> None:
         self.start_loading()
+        self.watchdog.start()
         for line in sys.stdin:
             if line.strip():
                 self.handle_line(line)
         self.shutdown()
 
     def shutdown(self) -> None:
+        self.watchdog.stop()
         self.heavy_executor.shutdown(wait=True)
         self.light_executor.shutdown(wait=True)
         if self.service is not None:

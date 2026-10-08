@@ -319,7 +319,7 @@ export interface ModelsService {
 }
 
 export interface LabelingService {
-  /** Normalizes through primitives, stores as labeled and trains the project's model. */
+  /** Normalizes through primitives and stores as labeled; model training is queued in the background. */
   confirm(itemId: string, annotations: Annotation[]): Promise<Item>;
   skip(itemId: string): Item;
   /** Most uncertain pending item, or `waiting` while the session is still producing. */
@@ -327,6 +327,8 @@ export interface LabelingService {
   suggestions(item: Item): Promise<Record<string, number>>;
   /** Re-trains with every labeled item in a session (after a model change or import). */
   backfill(sessionId: string): Promise<void>;
+  /** Resolves once no background training is running or queued. */
+  idle(): Promise<void>;
 }
 
 // --- workflows ---------------------------------------------------------------------------

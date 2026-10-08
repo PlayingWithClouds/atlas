@@ -3,6 +3,7 @@ import { classNamesOf } from "@atlas/contracts";
 import type { Item, ItemStatus, Session, SourceRef } from "@atlas/contracts";
 import { HttpError } from "@atlas/contracts/server";
 import type { ModelProvider } from "@atlas/contracts/server";
+import { withInteractiveDeadline } from "../deadline";
 import type { SourcesCore } from "../sources";
 import {
   addRoute,
@@ -94,7 +95,10 @@ async function sortByUncertainty(ctx: Context, session: Session, items: Item[]):
     return items;
   }
   const refs = embedded.map((item) => item.ref);
-  const ranking = await provider.rank(project.id, refs, classNamesOf(project.config));
+  const ranking = await withInteractiveDeadline(provider.rank(project.id, refs, classNamesOf(project.config)), {
+    order: [] as string[],
+    trained: false,
+  });
   const byRef = new Map(embedded.map((item) => [item.ref, item]));
   const ranked = ranking.order.map((ref) => byRef.get(ref)).filter((item): item is Item => item !== undefined);
   const rankedIds = new Set(ranked.map((item) => item.id));
