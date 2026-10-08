@@ -1,7 +1,10 @@
 # Launch the whole atlas stack locally (run from the repo root):
 #
-#   process-compose up          # TUI with per-process logs
-#   process-compose up -t=false # plain, no TUI
+#   process-compose up -U          # TUI with per-process logs
+#   process-compose up -U -t=false # plain, no TUI
+#
+# -U puts process-compose's own API on a unix socket: its default TCP port 8080
+# is where the veil backend listens.
 #
 # The Go backend runs under `air` (live reload). Ordering is handled by readiness
 # probes: surreal + the three plugins come up first, then the backend, then web.
@@ -29,7 +32,7 @@ processes:
   veil:
     command: "bun run plugins/veil/index.ts"
     environment:
-      - "VEIL_URL=https://api.veil.localhost:45417"
+      - "VEIL_URL=${VEIL_URL:-http://localhost:8080}"
     readiness_probe:
       http_get:
         host: 127.0.0.1
