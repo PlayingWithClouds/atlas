@@ -15,10 +15,23 @@ const STDIN_CLOSE_GRACE_MS = 3000;
 const STABLE_RUN_MS = 60_000;
 const STACK_DUMP_INTERVAL_MS = 60_000;
 
+/**
+ * Bun's subprocess pipes can stop delivering a live child's output: the worker answers,
+ * but its replies never reach the client. A heartbeat detects that and replaces the child.
+ */
+export interface HeartbeatOptions {
+  intervalMs: number;
+  timeoutMs: number;
+}
+
+const DEFAULT_HEARTBEAT: HeartbeatOptions = { intervalMs: 10_000, timeoutMs: 5000 };
+
 interface ChildHandle {
   process: Bun.Subprocess<"pipe", "pipe", "pipe">;
   client: JsonRpcClient;
   startedAt: number;
+  heartbeat?: ReturnType<typeof setInterval>;
+  heartbeatInFlight?: boolean;
 }
 
 interface Gate {
@@ -51,7 +64,10 @@ export class WorkerSupervisor {
   private restartDelayMs = INITIAL_BACKOFF_MS;
   private restartTimer: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(private readonly logger: EnvironmentLogger) {}
+  constructor(
+    private readonly logger: EnvironmentLogger,
+    private readonly heartbeat: HeartbeatOptions = DEFAULT_HEARTBEAT,
+  ) {}
 
   get running(): boolean {
     return this.current !== undefined;
@@ -120,17 +136,57 @@ export class WorkerSupervisor {
     this.current = child;
     this.gate.open(child);
     this.forwardOutput(child, plan);
+    child.heartbeat = setInterval(() => this.checkHeartbeat(child, plan), this.heartbeat.intervalMs);
     childProcess.exited.then((exitCode) => this.handleExit(child, plan, exitCode));
   }
 
   private forwardOutput(child: ChildHandle, plan: LaunchPlan): void {
     const stdout = child.process.stdout;
     const stderr = child.process.stderr;
-    readLines(stdout, (line) => child.client.handleLine(line)).catch(() => undefined);
+    readLines(stdout, (line) => child.client.handleLine(line)).catch((error: Error) => {
+      this.logger.error(`[${plan.label}] reading worker output failed: ${error.message}`);
+    });
     readLines(stderr, (line) => this.logger.info(`[${plan.label}] ${line}`)).catch(() => undefined);
   }
 
+  private async checkHeartbeat(child: ChildHandle, plan: LaunchPlan): Promise<void> {
+    if (child.heartbeatInFlight) {
+      return;
+    }
+    child.heartbeatInFlight = true;
+    try {
+      await child.client.call("ping", {}, this.heartbeat.timeoutMs);
+    } catch (error) {
+      if (error instanceof RpcTimeoutError) {
+        this.replaceUnresponsive(child, plan);
+      }
+    } finally {
+      child.heartbeatInFlight = false;
+    }
+  }
+
+  /** Does not wait for `exited`: the same stall can keep Bun from noticing the exit. */
+  private replaceUnresponsive(child: ChildHandle, plan: LaunchPlan): void {
+    if (this.current !== child || this.stopped) {
+      return;
+    }
+    this.logger.error(`[${plan.label}] worker stopped answering; restarting it`);
+    this.release(child, new Error("python worker stopped answering"));
+    child.process.kill("SIGKILL");
+    this.gate = createGate();
+    this.scheduleRestart(plan);
+  }
+
+  private release(child: ChildHandle, error: Error): void {
+    clearInterval(child.heartbeat);
+    child.client.rejectAll(error);
+    if (this.current === child) {
+      this.current = undefined;
+    }
+  }
+
   private handleExit(child: ChildHandle, plan: LaunchPlan, exitCode: number): void {
+    clearInterval(child.heartbeat);
     child.client.rejectAll(new Error(`python worker exited (code ${exitCode})`));
     if (this.current !== child) {
       return;
@@ -167,7 +223,7 @@ export class WorkerSupervisor {
     if (child === undefined) {
       return;
     }
-    child.client.rejectAll(new Error("python worker stopped"));
+    this.release(child, new Error("python worker stopped"));
     await shutDownChild(child);
   }
 }
