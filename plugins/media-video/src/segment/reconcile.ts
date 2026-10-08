@@ -72,9 +72,10 @@ export async function dropUnlabeled(
 }
 
 /**
- * Reacts to a segment node whose settings changed since this video was cut. Every boundary
- * moves, so untouched clips are dropped to make room while labeled and skipped clips stay:
- * a threshold tweak must not undo human work. A first cut only records the fingerprint.
+ * Makes the video's untouched clips match the plan. Labeled and skipped clips stay: a threshold
+ * tweak must not undo human work. Compares against the plan rather than the settings because
+ * the same settings can cut differently, e.g. when scene detection failed on an earlier run
+ * and fell back to fixed windows.
  */
 export async function resegment(
   ctx: Context,
@@ -84,22 +85,18 @@ export async function resegment(
   fingerprint: string,
   planned: SpanPlan[],
 ): Promise<void> {
-  const previous = storedFingerprint(session, videoRef);
-  if (previous === fingerprint) {
-    return;
+  const dropped = await dropUnlabeled(ctx, provider, session, videoRef, planned);
+  if (dropped > 0) {
+    ctx.notifications.persist({
+      key: `segment:${session.id}`,
+      message: `Re-segmenting "${session.label}": dropped ${dropped} unlabeled clips`,
+      sessionId: session.id,
+      level: "info",
+    });
   }
-  if (previous !== undefined) {
-    const dropped = await dropUnlabeled(ctx, provider, session, videoRef, planned);
-    if (dropped > 0) {
-      ctx.notifications.persist({
-        key: `segment:${session.id}`,
-        message: `Re-segmenting "${session.label}": dropped ${dropped} unlabeled clips`,
-        sessionId: session.id,
-        level: "info",
-      });
-    }
+  if (storedFingerprint(session, videoRef) !== fingerprint) {
+    storeFingerprint(ctx, session.id, videoRef, fingerprint);
   }
-  storeFingerprint(ctx, session.id, videoRef, fingerprint);
 }
 
 /** Drops the throwaway embeddings of atoms that were merged away. */

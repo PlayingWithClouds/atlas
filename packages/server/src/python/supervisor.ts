@@ -1,4 +1,4 @@
-import { DEFAULT_CALL_TIMEOUT_MS, JsonRpcClient } from "./rpc";
+import { DEFAULT_CALL_TIMEOUT_MS, JsonRpcClient, RpcTimeoutError } from "./rpc";
 import { readLines } from "./lines";
 import type { EnvironmentLogger } from "./environment";
 
@@ -13,6 +13,7 @@ const INITIAL_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 30_000;
 const STDIN_CLOSE_GRACE_MS = 3000;
 const STABLE_RUN_MS = 60_000;
+const STACK_DUMP_INTERVAL_MS = 60_000;
 
 interface ChildHandle {
   process: Bun.Subprocess<"pipe", "pipe", "pipe">;
@@ -46,6 +47,7 @@ export class WorkerSupervisor {
   private gate: Gate = createGate();
   private current: ChildHandle | undefined;
   private stopped = false;
+  private lastStackDump = 0;
   private restartDelayMs = INITIAL_BACKOFF_MS;
   private restartTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -72,7 +74,24 @@ export class WorkerSupervisor {
 
   async call<T>(method: string, params: Record<string, unknown>, timeoutMs = DEFAULT_CALL_TIMEOUT_MS): Promise<T> {
     const child = await this.waitForChild(timeoutMs, method);
-    return child.client.call<T>(method, params, timeoutMs);
+    try {
+      return await child.client.call<T>(method, params, timeoutMs);
+    } catch (error) {
+      if (error instanceof RpcTimeoutError) {
+        this.dumpStacks(child, method);
+      }
+      throw error;
+    }
+  }
+
+  /** A timed-out call usually means a stuck thread; the worker prints every stack on SIGUSR1. */
+  private dumpStacks(child: ChildHandle, method: string): void {
+    if (Date.now() - this.lastStackDump < STACK_DUMP_INTERVAL_MS || child.process.exitCode !== null) {
+      return;
+    }
+    this.lastStackDump = Date.now();
+    this.logger.error(`"${method}" timed out; dumping worker stacks`);
+    child.process.kill("SIGUSR1");
   }
 
   private waitForChild(timeoutMs: number, method: string): Promise<ChildHandle> {
