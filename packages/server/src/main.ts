@@ -51,6 +51,10 @@ async function serve(workspaceDirectory: string, port: number | undefined): Prom
 }
 
 async function main(): Promise<void> {
+  if (process.argv[2] === "migrate") {
+    const { migrateCommand } = await import("./migrate/cli");
+    process.exit(await migrateCommand(process.argv.slice(3)));
+  }
   const args = parseArguments(process.argv.slice(2));
   if (!args.workspaceDirectory) {
     console.error("usage: main.ts [init] <workspaceDir> [--port N]");
