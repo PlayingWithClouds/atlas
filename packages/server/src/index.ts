@@ -21,3 +21,5 @@ export { describeItem, describeItems, sourceRefOf } from "./services/media";
 export { default as PythonRuntime } from "./python/service";
 export { registerPythonModel } from "./python/modelProvider";
 export type { PythonModelOptions } from "./python/modelProvider";
+export { default as WorkflowsCore } from "./services/workflows";
+export { default as ToolsCore } from "./services/tools";

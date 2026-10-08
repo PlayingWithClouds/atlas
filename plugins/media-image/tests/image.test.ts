@@ -181,25 +181,15 @@ test("quality metrics and thresholds", async () => {
   expect(rejects(white, settingsOf({ check: "dark" }))).toBe(false);
 });
 
-test("lifecycle: media kind registered, then gone after removal from atlas.json", async () => {
-  expect(host.context.mediaKinds.get("image")).toBeDefined();
-  writeAtlasConfig(workspaceDirectory, configWith([]));
-  await host.context.plugins.reload();
-  expect(host.context.mediaKinds.get("image")).toBeUndefined();
-});
+function registeredQualityNode(): NodeType | undefined {
+  const workflows = host.context.workflows as unknown as { nodeTypes: Map<string, NodeType> };
+  return workflows.nodeTypes.get("quality");
+}
 
-test("quality node registers while a workflows service exists and runs", async () => {
-  const registered: NodeType[] = [];
-  const fakeWorkflows = {
-    registerNode(nodeType: NodeType) {
-      registered.push(nodeType);
-      return () => registered.splice(registered.indexOf(nodeType), 1);
-    },
-  };
-  const disposeWorkflows = host.context.provide("workflows", fakeWorkflows as never);
-  await Bun.sleep(20);
-  expect(registered.map((nodeType) => nodeType.type)).toEqual(["quality"]);
-  expect(registered[0].mediaKinds).toEqual(["image"]);
+test("quality node registers with the workflows service and runs", async () => {
+  const qualityNode = registeredQualityNode();
+  expect(qualityNode).toBeDefined();
+  expect(qualityNode!.mediaKinds).toEqual(["image"]);
 
   const dark = path.join(workspaceDirectory, "dark.png");
   const lively = path.join(workspaceDirectory, "lively.png");
@@ -211,16 +201,15 @@ test("quality node registers while a workflows service exists and runs", async (
   const workItems = ["dark", "lively"].map((ref) => ({ ref, status: "pending", embedded: false, annotations: [] }));
   const context = { session: { id: itemsByRef.dark.sessionId }, params: { action: "skip" }, job: { progress() {} } };
 
-  const result = await registered[0].run(workItems as never, context as never);
+  const result = await qualityNode!.run(workItems as never, context as never);
   expect(result.items.map((item) => item.ref)).toEqual(["lively"]);
   expect(host.context.items.get(itemsByRef.dark.id)?.status).toBe("skipped");
-
-  disposeWorkflows();
-  await Bun.sleep(20);
-  expect(registered).toEqual([]);
 });
 
-test("plugin works without a workflows service", () => {
-  expect(host.context.workflows).toBeUndefined();
+test("lifecycle: media kind and quality node gone after removal from atlas.json", async () => {
   expect(host.context.mediaKinds.get("image")).toBeDefined();
+  writeAtlasConfig(workspaceDirectory, configWith([]));
+  await host.context.plugins.reload();
+  expect(host.context.mediaKinds.get("image")).toBeUndefined();
+  expect(registeredQualityNode()).toBeUndefined();
 });
