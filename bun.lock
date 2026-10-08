@@ -235,10 +235,6 @@
         "@neoworks/extension-system": "link:@neoworks/extension-system",
       },
     },
-    "sdk/ts": {
-      "name": "@atlas/plugin-sdk",
-      "version": "0.1.0",
-    },
   },
   "packages": {
     "@atlas/contracts": ["@atlas/contracts@workspace:packages/contracts"],
@@ -270,8 +266,6 @@
     "@atlas/plugin-primitive-region": ["@atlas/plugin-primitive-region@workspace:plugins/primitive-region"],
 
     "@atlas/plugin-primitive-tag": ["@atlas/plugin-primitive-tag@workspace:plugins/primitive-tag"],
-
-    "@atlas/plugin-sdk": ["@atlas/plugin-sdk@workspace:sdk/ts"],
 
     "@atlas/plugin-source-fs": ["@atlas/plugin-source-fs@workspace:plugins/source-fs"],
 
