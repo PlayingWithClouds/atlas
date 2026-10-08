@@ -16,9 +16,12 @@
 	const labeler = $derived(
 		ctx.gridLabelers.list().find((candidate) => candidate.matches(project))
 	);
-	const actions = $derived(
-		status ? ctx.toolbarActions.list().filter((action) => action.when(project, status!.session)) : []
-	);
+	// Grid labelers render toolbar actions themselves (with their selection); the page only
+	// offers them while no labeler is active.
+	const fallbackActions = $derived.by(() => {
+		if (labeler || !status) return [];
+		return ctx.toolbarActions.list().filter((action) => action.when(project, status!.session));
+	});
 
 	async function loadStatus(id: string) {
 		error = '';
@@ -63,7 +66,7 @@
 			<span class="text-faint text-xs">{status.labeled}/{status.total} labeled</span>
 			{#if status.session.producing}<span class="loading loading-xs"></span>{/if}
 			<div class="ml-auto flex items-center gap-1">
-				{#each actions as action (action.id)}
+				{#each fallbackActions as action (action.id)}
 					<button type="button" class="btn btn-sm btn-ghost" onclick={() => runAction(action.id)}>
 						{#if action.icon}<action.icon size={14} />{/if}
 						{action.label}

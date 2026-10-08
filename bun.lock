@@ -167,7 +167,12 @@
       "dependencies": {
         "@atlas/contracts": "workspace:*",
         "@atlas/server": "workspace:*",
+        "@atlas/web": "workspace:*",
         "@neoworks/extension-system": "link:@neoworks/extension-system",
+        "phosphor-svelte": "^3.0.0",
+      },
+      "devDependencies": {
+        "svelte": "^5.19.0",
       },
     },
     "plugins/primitive-region": {

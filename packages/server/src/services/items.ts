@@ -324,6 +324,12 @@ export class ItemsCore extends Service implements ItemsService {
     this.changed(existing.sessionId);
   }
 
+  compact(sessionId: string): void {
+    this.requireSession(sessionId);
+    this.ctx.db.transaction(() => this.renumber(sessionId));
+    this.changed(sessionId);
+  }
+
   labeledInProject(projectId: string): Item[] {
     const rows = this.ctx.db.database
       .query(
@@ -368,6 +374,19 @@ export class ItemsCore extends Service implements ItemsService {
       return undefined;
     }
     return itemId;
+  }
+
+  /** Parks every idx above the current maximum first so UNIQUE(session_id, idx) never collides. */
+  private renumber(sessionId: string): void {
+    const parkOffset = this.maxIndex(sessionId) + 1;
+    const database = this.ctx.db.database;
+    database.query("UPDATE items SET idx = idx + ? WHERE session_id = ?").run(parkOffset, sessionId);
+    const rows = database
+      .query("SELECT id FROM items WHERE session_id = ? ORDER BY idx")
+      .all(sessionId) as { id: string }[];
+    rows.forEach((row, position) => {
+      database.query("UPDATE items SET idx = ? WHERE id = ?").run(position, row.id);
+    });
   }
 
   private maxIndex(sessionId: string): number {

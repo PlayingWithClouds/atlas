@@ -64,6 +64,9 @@ export async function dropUnlabeled(
   for (const item of dropped) {
     ctx.items.remove(item.id);
   }
+  if (dropped.length > 0) {
+    ctx.items.compact(session.id);
+  }
   await forgetQuietly(provider, session.projectId, dropped.map((item) => item.ref));
   return dropped.length;
 }

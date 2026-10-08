@@ -1,8 +1,7 @@
 version: "3"
 
-vars:
-  MODEL_VENV: plugins/model/.venv
-  MODEL_PY: plugins/model/.venv/bin/python
+env:
+  ATLAS_WORKSPACE: '{{.ATLAS_WORKSPACE | default ".atlas-workspace"}}'
 
 tasks:
   default:
@@ -11,106 +10,33 @@ tasks:
       - task --list
     silent: true
 
-  setup:
-    desc: Install everything (model plugin venv, TS deps, web deps)
-    cmds:
-      - task: setup:model
-      - task: setup:ts
-      - task: setup:web
-
-  setup:model:
-    desc: Create the Python model-plugin venv and install requirements
-    dir: plugins/model
-    cmds:
-      - python -m venv .venv
-      - .venv/bin/pip install -U pip
-      - .venv/bin/pip install -r requirements.txt
-    status:
-      - test -f .venv/bin/uvicorn
-
-  setup:ts:
-    desc: Install TS SDK + plugin dependencies (root bun workspace)
-    cmds:
-      - bun install
-    status:
-      - test -d node_modules
-
-  setup:web:
-    desc: Install frontend dependencies
-    dir: web
-    cmds:
-      - bun install
-    status:
-      - test -d node_modules
-
-  surreal:
-    desc: Run SurrealDB (file-backed) on :8020 for durable storage / crash recovery
-    cmds:
-      - 'DB=${ATLAS_WORKSPACE:+$ATLAS_WORKSPACE/db}; DB=${DB:-.data}; mkdir -p "$DB" && surreal start --user root --pass root --bind 127.0.0.1:8020 surrealkv://"$DB"/atlas.db'
-
   up:
-    desc: Launch the whole stack via process-compose (backend under air live-reload)
+    desc: Launch server + web via process-compose
     cmds:
       - process-compose up -U
 
-  backend:
-    desc: Run the Go backend on :8123 (live-reload via air)
-    dir: backend
+  server:
+    desc: Run the Bun server (watch mode) on :8123
     cmds:
-      - air
-
-  plugin:veil:
-    desc: Run the veil data-source plugin (TS) on :9101
-    cmds:
-      - bun run plugins/veil/index.ts
-
-  plugin:fs:
-    desc: Run the filesystem data-source plugin (Go) on :9102
-    cmds:
-      - go run ./plugins/fs
-
-  plugin:model:
-    desc: Run the model plugin (embed + classifier head) on :9301
-    cmds:
-      - "{{.MODEL_VENV}}/bin/uvicorn plugins.model.main:app --port 9301"
-
-  plugin:joytag:
-    desc: Run the JoyTag tagger plugin on :9302 (shares the model plugin venv)
-    cmds:
-      - "{{.MODEL_VENV}}/bin/uvicorn plugins.joytag.main:app --port 9302"
-
-  plugins:
-    desc: Run all plugins (veil + fs + model + joytag)
-    deps:
-      - plugin:veil
-      - plugin:fs
-      - plugin:model
-      - plugin:joytag
+      - bun --watch packages/server/src/main.ts "$ATLAS_WORKSPACE" --port 8123
 
   web:
-    desc: Run the Svelte frontend on :5173
-    dir: web
+    desc: Run the Vite dev server on :5173 (proxies /api to :8123)
+    dir: packages/web
     cmds:
       - bun run dev
 
-  dev:
-    desc: Run SurrealDB + backend + plugins + frontend together
-    deps:
-      - surreal
-      - backend
-      - plugin:veil
-      - plugin:fs
-      - plugin:model
-      - plugin:joytag
-      - web
-
-  build:
-    desc: Build the frontend for production
-    dir: web
+  test:
+    desc: Run server, plugin and web tests
     cmds:
-      - bun run build
+      - bun test packages/web tests/server plugins
 
-  clean:
-    desc: Remove venvs, node_modules, build output, local DB
+  check:
+    desc: Typecheck server/contracts/plugins and svelte-check web + plugin web configs
     cmds:
-      - rm -rf plugins/model/.venv node_modules web/node_modules web/build .data
+      - ./scripts/check.sh
+
+  init:
+    desc: Create the workspace directory ($ATLAS_WORKSPACE, default .atlas-workspace)
+    cmds:
+      - bun packages/server/src/main.ts init "$ATLAS_WORKSPACE"

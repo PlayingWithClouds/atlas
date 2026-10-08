@@ -8,6 +8,7 @@ const REGISTRY_KEYS = [
   'gridLabelers',
   'itemLabelers',
   'mediaCells',
+  'mediaTools',
   'annotationTools',
   'sourcePickers',
   'projectTemplates',
