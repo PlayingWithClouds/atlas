@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { resolveClipRange, MINIMUM_SPAN_SECONDS } from "../src/clipRange";
-import { MAX_RANGE_BYTES, boundedRange, ignoresRanges, isHlsUrl, isStaleStatus, parseSingleRange } from "../src/range";
+import { inputArguments } from "../src/ffmpeg";
+import { MAX_RANGE_BYTES, boundedRange, ignoresRanges, isHlsLocation, isHlsUrl, isStaleStatus, parseSingleRange } from "../src/range";
 
 const TOTAL = 100 << 20;
 
@@ -61,4 +62,13 @@ test("resolveClipRange applies overrides and clamps to the video", () => {
   expect(resolveClipRange(stored, { start: 11.5, end: 99999 }, 3600)).toEqual({ start: 11.5, end: 3600 });
   const degenerate = resolveClipRange(stored, { start: 20, end: 20.01 }, 3600);
   expect(degenerate.end - degenerate.start).toBeCloseTo(MINIMUM_SPAN_SECONDS);
+});
+
+test("HLS locations relax ffmpeg's segment extension check, other inputs do not", () => {
+  const proxied = inputArguments({ kind: "url", url: "http://veil.test/api/stream/manifest?s=1", format: "hls" });
+  expect(proxied.indexOf("-extension_picky")).toBeGreaterThanOrEqual(0);
+  expect(proxied.indexOf("-extension_picky")).toBeLessThan(proxied.indexOf("-i"));
+  expect(isHlsLocation({ url: "https://cdn.example.com/a.m3u8" })).toBe(true);
+  expect(inputArguments({ kind: "url", url: "https://cdn.example.com/a.mp4" })).not.toContain("-extension_picky");
+  expect(inputArguments({ kind: "file", path: "/v.mp4" })).toEqual(["-i", "/v.mp4"]);
 });

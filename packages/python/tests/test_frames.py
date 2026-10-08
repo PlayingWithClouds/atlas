@@ -44,6 +44,13 @@ def test_no_headers_means_no_header_flags():
     assert ffmpeg_input_options({"kind": "url", "url": "http://x"}) == []
 
 
+def test_hls_locations_relax_the_segment_extension_check():
+    hls = {"kind": "url", "url": "http://x/manifest", "format": "hls"}
+    command = window_command(hls, 0.0, 4.0, 8, "/out/%03d.jpg")
+    assert option_after(command, "-extension_picky") == "0"
+    assert command.index("-extension_picky") < command.index("-i")
+
+
 def make_video(path: str, seconds: int) -> None:
     subprocess.run(
         ["ffmpeg", "-nostdin", "-loglevel", "error", "-y",

@@ -3,6 +3,7 @@ import path from "node:path";
 import type { Span } from "@atlas/contracts";
 import type { MediaLocation } from "@atlas/contracts/server";
 import { fileHasContent } from "./caches";
+import { isHlsLocation } from "./range";
 import { parseSceneCuts, sceneFilter, sceneTimeoutMs } from "./scenes";
 
 /**
@@ -45,11 +46,19 @@ function headerArguments(headers: Record<string, string> | undefined): string[] 
   return ["-headers", lines.join("")];
 }
 
+/** Proxied HLS segments often lack a media extension, which ffmpeg's HLS demuxer rejects by default. */
+function formatArguments(location: MediaLocation): string[] {
+  if (location.kind === "url" && isHlsLocation(location)) {
+    return ["-extension_picky", "0"];
+  }
+  return [];
+}
+
 export function inputArguments(location: MediaLocation): string[] {
   if (location.kind === "file") {
     return ["-i", location.path];
   }
-  return [...headerArguments(location.headers), "-i", location.url];
+  return [...headerArguments(location.headers), ...formatArguments(location), "-i", location.url];
 }
 
 function seconds(value: number): string {
@@ -94,7 +103,7 @@ export class FfmpegTools implements VideoTools {
     const target = location.kind === "file" ? location.path : location.url;
     const args = ["-v", "error"];
     if (location.kind === "url") {
-      args.push(...headerArguments(location.headers));
+      args.push(...headerArguments(location.headers), ...formatArguments(location));
     }
     args.push("-show_entries", "format=duration", "-of", "default=nk=1:nw=1", target);
     const result = await this.run("ffprobe", args, PROBE_TIMEOUT_MS);

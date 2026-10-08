@@ -77,6 +77,11 @@ export function isHlsUrl(url: string): boolean {
   return pathname.toLowerCase().endsWith(".m3u8");
 }
 
+/** Sources flag playlists whose URL hides it (e.g. a proxy route) with `format: "hls"`. */
+export function isHlsLocation(location: { url: string; format?: string }): boolean {
+  return location.format === "hls" || isHlsUrl(location.url);
+}
+
 /**
  * True when the source cannot answer byte ranges: it replied 200 to a range request, or says
  * so outright. The session then falls back to playing cut clips.

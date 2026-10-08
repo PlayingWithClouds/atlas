@@ -110,8 +110,21 @@ def load_image(location: dict) -> Image.Image:
 
 def ffmpeg_input_options(location: dict) -> list[str]:
     """Per-input ffmpeg flags; they must precede `-i` to apply to that input."""
-    headers = location_headers(location)
-    if location["kind"] != "url" or not headers:
+    if location["kind"] != "url":
+        return []
+    return header_options(location_headers(location)) + format_options(location)
+
+
+def format_options(location: dict) -> list[str]:
+    """Proxied HLS segments often lack a media extension, which the HLS demuxer rejects by default."""
+    path = location["url"].split("?", 1)[0].split("#", 1)[0].lower()
+    if location.get("format") == "hls" or path.endswith(".m3u8"):
+        return ["-extension_picky", "0"]
+    return []
+
+
+def header_options(headers: dict) -> list[str]:
+    if not headers:
         return []
     options = []
     user_agent = headers.get("User-Agent")
