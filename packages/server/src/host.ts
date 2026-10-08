@@ -13,6 +13,7 @@ import NotificationsCore from "./services/notifications";
 import PluginsCore from "./services/plugins";
 import PrimitivesCore from "./services/primitives";
 import ProjectsCore from "./services/projects";
+import PythonRuntime from "./python/service";
 import SourcesCore from "./services/sources";
 import WorkspaceCore from "./services/workspace";
 
@@ -50,7 +51,7 @@ async function mountCoreServices(context: Context, options: HostOptions, mounted
     [SourcesCore, undefined],
     [LabelingCore, undefined],
     [DomainRoutes, undefined],
-    // TODO(main thread): mount the python worker service (src/python/service.ts default export) here.
+    [PythonRuntime, undefined],
     [PluginsCore, undefined],
   ];
   for (const [service, config] of mounts) {
