@@ -13,6 +13,8 @@ const apiTarget = `http://localhost:${process.env.ATLAS_PORT ?? 8123}`;
 // <img src="/api/..."> works with relative URLs and no CORS is involved.
 export default defineConfig({
 	plugins: [tailwindcss(), svelte(), atlasWorkspacePlugins(workspaceDirectory)],
+	// Plugin web entries live outside this package and must share its single Svelte runtime.
+	resolve: { dedupe: ['svelte'] },
 	server: {
 		proxy: {
 			'/api': {

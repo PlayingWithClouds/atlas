@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Item, Session } from '@atlas/contracts';
+	import type { Snippet } from 'svelte';
 	import { kernelContext } from '../../kernel/context';
 	import EmptyState from './EmptyState.svelte';
 
@@ -10,7 +11,8 @@
 		activeId,
 		minimumCellWidth = 180,
 		onSelect,
-		onOpen
+		onOpen,
+		overlay
 	}: {
 		items: Item[];
 		session: Session;
@@ -19,6 +21,8 @@
 		minimumCellWidth?: number;
 		onSelect?: (item: Item, event: MouseEvent) => void;
 		onOpen?: (item: Item) => void;
+		/** Extra content layered over each cell, e.g. tags. */
+		overlay?: Snippet<[Item]>;
 	} = $props();
 
 	const ctx = kernelContext();
@@ -74,8 +78,14 @@
 			{#if cell}
 				<cell.component {item} {session} active={activeId === item.id} />
 			{:else}
-				<div class="text-faint flex aspect-[4/3] items-center justify-center text-xs">{item.mediaKind}</div>
+				<img
+					src={ctx.api.url(`/items/${item.id}/thumbnail`)}
+					alt=""
+					class="aspect-[4/3] w-full object-cover"
+					loading="lazy"
+				/>
 			{/if}
+			{@render overlay?.(item)}
 		</div>
 	{/each}
 </div>

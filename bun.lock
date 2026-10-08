@@ -58,6 +58,38 @@
         "vite": "^6.0.0",
       },
     },
+    "plugins/assistant": {
+      "name": "@atlas/plugin-assistant",
+      "version": "0.0.0",
+      "dependencies": {
+        "@atlas/contracts": "workspace:*",
+        "@atlas/web": "workspace:*",
+        "@neoworks/extension-system": "link:@neoworks/extension-system",
+        "marked": "^18.0.7",
+        "phosphor-svelte": "^3.0.0",
+      },
+      "devDependencies": {
+        "svelte": "^5.19.0",
+      },
+    },
+    "plugins/assistant-claude": {
+      "name": "@atlas/plugin-assistant-claude",
+      "version": "0.0.0",
+      "dependencies": {
+        "@atlas/contracts": "workspace:*",
+        "@atlas/plugin-assistant": "workspace:*",
+        "@neoworks/extension-system": "link:@neoworks/extension-system",
+      },
+    },
+    "plugins/assistant-ollama": {
+      "name": "@atlas/plugin-assistant-ollama",
+      "version": "0.0.0",
+      "dependencies": {
+        "@atlas/contracts": "workspace:*",
+        "@atlas/plugin-assistant": "workspace:*",
+        "@neoworks/extension-system": "link:@neoworks/extension-system",
+      },
+    },
     "plugins/core-nodes": {
       "name": "@atlas/plugin-core-nodes",
       "version": "0.0.0",
@@ -104,6 +136,14 @@
       },
       "devDependencies": {
         "svelte": "^5.19.0",
+      },
+    },
+    "plugins/mcp": {
+      "name": "@atlas/plugin-mcp",
+      "version": "0.0.0",
+      "dependencies": {
+        "@atlas/contracts": "workspace:*",
+        "@neoworks/extension-system": "link:@neoworks/extension-system",
       },
     },
     "plugins/media-image": {
@@ -180,6 +220,12 @@
   "packages": {
     "@atlas/contracts": ["@atlas/contracts@workspace:packages/contracts"],
 
+    "@atlas/plugin-assistant": ["@atlas/plugin-assistant@workspace:plugins/assistant"],
+
+    "@atlas/plugin-assistant-claude": ["@atlas/plugin-assistant-claude@workspace:plugins/assistant-claude"],
+
+    "@atlas/plugin-assistant-ollama": ["@atlas/plugin-assistant-ollama@workspace:plugins/assistant-ollama"],
+
     "@atlas/plugin-core-nodes": ["@atlas/plugin-core-nodes@workspace:plugins/core-nodes"],
 
     "@atlas/plugin-encoder-dinov2": ["@atlas/plugin-encoder-dinov2@workspace:plugins/encoder-dinov2"],
@@ -189,6 +235,8 @@
     "@atlas/plugin-encoder-siglip": ["@atlas/plugin-encoder-siglip@workspace:plugins/encoder-siglip"],
 
     "@atlas/plugin-exporter-folder": ["@atlas/plugin-exporter-folder@workspace:plugins/exporter-folder"],
+
+    "@atlas/plugin-mcp": ["@atlas/plugin-mcp@workspace:plugins/mcp"],
 
     "@atlas/plugin-media-image": ["@atlas/plugin-media-image@workspace:plugins/media-image"],
 
