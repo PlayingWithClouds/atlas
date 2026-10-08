@@ -13,6 +13,8 @@ interface RpcResponse {
   error?: { code: number; message: string };
 }
 
+export class RpcTimeoutError extends Error {}
+
 export class RpcError extends Error {
   constructor(
     message: string,
@@ -72,7 +74,7 @@ export class JsonRpcClient {
   private expire(id: number): void {
     const call = this.settle(id);
     if (call !== undefined) {
-      call.reject(new Error(`python call "${call.method}" timed out`));
+      call.reject(new RpcTimeoutError(`python call "${call.method}" timed out`));
     }
   }
 

@@ -114,6 +114,16 @@ describeWithPython("python worker", () => {
     await rejection;
   });
 
+  test("a timed-out call makes the worker print its thread stacks", async () => {
+    const root = createRoot();
+    const lines: string[] = [];
+    root.logger.exporter({ export: (message) => lines.push(message.args.map(String).join(" ")) });
+    const { worker } = await mount(root, "slow_encoder");
+    const item = { ref: "a", mediaKind: "image", location: { kind: "file", path: "a" } };
+    await expect(worker.call("embed", { projectId: "p", items: [item] }, { timeoutMs: 300 })).rejects.toThrow("timed out");
+    await waitFor(() => lines.some((line) => line.includes("most recent call first")), 5000);
+  });
+
   test("restarts after the child is killed", async () => {
     const { worker } = await mount(createRoot(), "atlas_ml.testing");
     await worker.call("ping", {});

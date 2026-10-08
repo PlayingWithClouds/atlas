@@ -9,10 +9,12 @@ stderr, because stdout is the protocol channel.
 """
 
 import argparse
+import faulthandler
 import importlib
 import json
 import os
 import re
+import signal
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -208,6 +210,8 @@ def resolve_device(requested: str) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = parse_arguments(argv)
+    # `kill -USR1 <pid>` dumps every thread's stack to stderr, which the host logs.
+    faulthandler.register(signal.SIGUSR1, all_threads=True)
     worker = Worker(arguments.module, arguments.cache_root, resolve_device(arguments.device))
     worker.serve()
     return 0
