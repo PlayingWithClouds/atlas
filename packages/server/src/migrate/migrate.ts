@@ -18,6 +18,7 @@ import {
   oldModelOf,
   sessionProjectId,
   storedItemRef,
+  usesJoytagNode,
   unixSecondsToIso,
 } from "./mapping";
 import type { NewProjectRow, OldImage, OldSession, OldWorkflow } from "./mapping";
@@ -384,7 +385,7 @@ function collectWarnings(data: SourceData, sessions: OldSession[], options: Migr
       warnings.push(`session ${session.id}: ${mapped.warning}`);
     }
   }
-  const pluginEntries = buildPluginEntries(veilDirectoryOf(options), warnings);
+  const pluginEntries = buildPluginEntries(veilDirectoryOf(options), warnings, usesJoytagNode(data.workflows));
   const known = declaredNodeTypes(pluginEntries.map((entry) => entry.path as string));
   const unknownTypes = unknownNodeTypes(data.workflows, known);
   if (unknownTypes.length > 0) {
@@ -426,6 +427,6 @@ async function execute(
   prepareTarget(options, plans);
   const poolRefs = await copyPools(plans, options, summary);
   await writeDatabase(data, sessions, reader, poolRefs, options, summary);
-  writeWorkspaceConfig(options.targetDirectory, data.title, buildPluginEntries(veilDirectoryOf(options), []), data.workflows);
+  writeWorkspaceConfig(options.targetDirectory, data.title, buildPluginEntries(veilDirectoryOf(options), [], usesJoytagNode(data.workflows)), data.workflows);
   options.log(`migrated into ${options.targetDirectory}`);
 }

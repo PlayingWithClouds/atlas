@@ -9,14 +9,17 @@ import {
   mapItemStatus,
   mapProjectConfig,
   mapSessionSource,
+  mapNodeType,
   mapWorkflow,
   parseModelMap,
   stripRecordPrefix,
+  usesJoytagNode,
   DEFAULT_MODEL_MAP,
 } from "../../packages/server/src/migrate/mapping";
 import type { OldImage, OldSession } from "../../packages/server/src/migrate/mapping";
 import { runMigration } from "../../packages/server/src/migrate/migrate";
 import type { MigrateOptions } from "../../packages/server/src/migrate/migrate";
+import { buildPluginEntries } from "../../packages/server/src/migrate/target";
 import { SurrealHttpClient, SurrealUnreachableError } from "../../packages/server/src/migrate/surrealClient";
 import { createHost } from "../../packages/server/src/index";
 import { makeTempDirectory } from "./helpers";
@@ -95,6 +98,33 @@ describe("mapping", () => {
     expect(stripRecordPrefix("image:abc", "image")).toBe("abc");
     expect(stripRecordPrefix("session:⟨1ab⟩", "session")).toBe("1ab");
     expect(stripRecordPrefix("abc", "image")).toBe("abc");
+  });
+
+  test("old node types map onto the new node names", () => {
+    const expected: Record<string, string> = {
+      source: "session-items", embed: "embed", "siglip.embed": "embed", predict: "predict", "siglip.predict": "predict",
+      dedupe: "dedupe", "siglip.dedupe": "dedupe", cluster: "cluster", propagate: "propagate", segment: "segment",
+      filter: "filter", sample: "sample", save: "save", action: "action", notify: "notify", quality: "quality",
+      trim: "trim", extract: "extract-frames", "node.tag": "joytag-tag", joytag: "joytag-tag",
+      "future.embed": "embed", "something-else": "something-else",
+    };
+    for (const [oldType, newType] of Object.entries(expected)) {
+      expect(mapNodeType(oldType)).toBe(newType);
+    }
+  });
+
+  test("workflows map node types and report whether joytag is needed", () => {
+    const old = (type: string) => mapWorkflow({ id: "w", label: "W", graph: { nodes: [{ id: "n", type }], edges: [] } });
+    expect(old("source").graph.nodes[0].type).toBe("session-items");
+    expect(usesJoytagNode([old("embed"), old("filter")])).toBe(false);
+    expect(usesJoytagNode([old("embed"), old("node.tag")])).toBe(true);
+  });
+
+  test("plugin entries always enable model-nodes and add tagger-joytag only on request", () => {
+    const packages = (include: boolean) => buildPluginEntries("/nonexistent-veil", [], include).map((entry) => entry.package);
+    expect(packages(false)).toContain("@atlas/plugin-model-nodes");
+    expect(packages(false)).not.toContain("@atlas/plugin-tagger-joytag");
+    expect(packages(true)).toContain("@atlas/plugin-tagger-joytag");
   });
 
   test("workflow graphs map pos to position and project to projectId", () => {
@@ -217,6 +247,9 @@ describe("migration", () => {
   test("migrates projects, sessions and items with ids preserved, then refuses a second run", async () => {
     const workspace = path.join(makeTempDirectory(), "ws");
     await runMigration(reader, optionsFor(workspace, oldCache, oldConfigPath));
+    const enabled = JSON.parse(fs.readFileSync(path.join(workspace, "atlas.json"), "utf8")).plugins.map((entry: { package: string }) => entry.package);
+    expect(enabled).toContain("@atlas/plugin-model-nodes");
+    expect(enabled).not.toContain("@atlas/plugin-tagger-joytag");
 
     const host = await openWithoutPlugins(workspace);
     try {
