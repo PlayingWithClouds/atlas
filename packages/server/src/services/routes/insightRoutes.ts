@@ -1,6 +1,7 @@
 import type { Context } from "@neoworks/extension-system";
 import { classNamesOf } from "@atlas/contracts";
 import type { Annotation, Project } from "@atlas/contracts";
+import { withInteractiveDeadline } from "../deadline";
 import { addRoute, requireProject } from "./helpers";
 
 const CLASS_THUMBNAIL_TTL_MS = 30_000;
@@ -39,10 +40,11 @@ async function projectStats(ctx: Context, project: Project) {
   const provider = ctx.models.get(project.config.model);
   let poolSize = 0;
   if (provider) {
-    poolSize = await provider.status(project.id, classNamesOf(project.config)).then(
-      (state) => state.poolSize,
-      () => 0,
-    );
+    const state = await withInteractiveDeadline(provider.status(project.id, classNamesOf(project.config)), {
+      poolSize: 0,
+      trained: false,
+    });
+    poolSize = state.poolSize;
   }
   const activeJobs = ctx.jobs
     .list({ activeOnly: true })

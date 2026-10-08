@@ -4,13 +4,37 @@ import { classNamesOf } from "@atlas/contracts";
 import type { Annotation, Item, Project } from "@atlas/contracts";
 import { HttpError } from "@atlas/contracts/server";
 import type { LabelingService, ModelProvider } from "@atlas/contracts/server";
+import { withInteractiveDeadline } from "./deadline";
 import { describeItems } from "./media";
+
+interface TrainingQueue {
+  pending: Map<string, Item>;
+  draining: boolean;
+  running: Promise<void>;
+}
 
 export class LabelingCore extends Service implements LabelingService {
   static inject = ["items", "projects", "models", "primitives", "notifications", "sources"];
 
+  private readonly trainingQueues = new Map<string, TrainingQueue>();
+  private disposed = false;
+
   constructor(ctx: Context) {
     super(ctx, "labeling");
+    ctx.effect(() => () => {
+      this.disposed = true;
+      this.trainingQueues.clear();
+    }, "labeling-training-queues");
+  }
+
+  async idle(): Promise<void> {
+    while (true) {
+      const active = [...this.trainingQueues.values()].filter((queue) => queue.draining).map((queue) => queue.running);
+      if (active.length === 0) {
+        return;
+      }
+      await Promise.all(active);
+    }
   }
 
   async confirm(itemId: string, annotations: Annotation[]): Promise<Item> {
@@ -19,7 +43,7 @@ export class LabelingCore extends Service implements LabelingService {
     const normalized = this.normalizeAnnotations(annotations, project);
     const labeled = this.ctx.items.setAnnotations(itemId, normalized, "labeled");
     this.ctx.emit("items/labeled", labeled);
-    await this.trainQuietly(project, [labeled]);
+    void this.scheduleTraining(project, [labeled]);
     return labeled;
   }
 
@@ -50,16 +74,15 @@ export class LabelingCore extends Service implements LabelingService {
     if (!provider) {
       return {};
     }
-    try {
-      const predictions = await provider.predict(project.id, [item.ref], classNamesOf(project.config));
-      const forItem = predictions[item.ref];
-      if (!forItem) {
-        return {};
-      }
-      return forItem;
-    } catch (error) {
+    const predictions = await withInteractiveDeadline(
+      provider.predict(project.id, [item.ref], classNamesOf(project.config)),
+      {} as Record<string, Record<string, number>>,
+    );
+    const forItem = predictions[item.ref];
+    if (!forItem) {
       return {};
     }
+    return forItem;
   }
 
   async backfill(sessionId: string): Promise<void> {
@@ -69,7 +92,7 @@ export class LabelingCore extends Service implements LabelingService {
     }
     const project = this.ctx.projects.get(session.projectId) as Project;
     const labeled = this.ctx.items.list(sessionId, { status: "labeled" });
-    await this.trainQuietly(project, labeled);
+    await this.scheduleTraining(project, labeled);
   }
 
   // --- internals ---------------------------------------------------------------------
@@ -131,6 +154,37 @@ export class LabelingCore extends Service implements LabelingService {
     return labels;
   }
 
+  /** Queues items for training; one drain per project runs at a time and folds pending items into one train call. */
+  private scheduleTraining(project: Project, items: Item[]): Promise<void> {
+    let queue = this.trainingQueues.get(project.id);
+    if (!queue) {
+      queue = { pending: new Map(), draining: false, running: Promise.resolve() };
+      this.trainingQueues.set(project.id, queue);
+    }
+    for (const item of items) {
+      queue.pending.set(item.id, item);
+    }
+    if (!queue.draining) {
+      queue.draining = true;
+      queue.running = this.drainTrainingQueue(project, queue);
+    }
+    return queue.running;
+  }
+
+  private async drainTrainingQueue(project: Project, queue: TrainingQueue): Promise<void> {
+    try {
+      while (queue.pending.size > 0 && !this.disposed) {
+        const batch = [...queue.pending.values()];
+        queue.pending.clear();
+        await this.trainQuietly(project, batch);
+      }
+    } catch (error) {
+      this.reportTrainingFailure(project, error);
+    } finally {
+      queue.draining = false;
+    }
+  }
+
   private async trainQuietly(project: Project, items: Item[]): Promise<void> {
     if (!this.isTrainable(project) || items.length === 0) {
       return;
@@ -188,15 +242,12 @@ export class LabelingCore extends Service implements LabelingService {
   }
 
   private async firstRanked(provider: ModelProvider, project: Project, embedded: Item[]): Promise<Item> {
-    try {
-      const refs = embedded.map((item) => item.ref);
-      const ranking = await provider.rank(project.id, refs, classNamesOf(project.config));
-      const top = embedded.find((item) => item.ref === ranking.order[0]);
-      if (top) {
-        return top;
-      }
-    } catch (error) {
-      return embedded[0];
+    const refs = embedded.map((item) => item.ref);
+    const fallback = { order: [] as string[], trained: false };
+    const ranking = await withInteractiveDeadline(provider.rank(project.id, refs, classNamesOf(project.config)), fallback);
+    const top = embedded.find((item) => item.ref === ranking.order[0]);
+    if (top) {
+      return top;
     }
     return embedded[0];
   }
