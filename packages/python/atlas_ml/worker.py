@@ -170,6 +170,10 @@ class Worker:
         if not isinstance(request, dict) or "method" not in request:
             self.write(self.error_response(None, INVALID_REQUEST, "invalid request"))
             return
+        if request["method"] == "ping":
+            # Answered inline: the host's heartbeat checks the pipe, not the thread pools.
+            self.handle_request(request, self.watchdog.begin("ping"))
+            return
         watch_key = self.watchdog.begin(request["method"])
         self.executor_for(request["method"]).submit(self.handle_request, request, watch_key)
 
