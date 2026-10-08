@@ -3,8 +3,7 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "plugins/*",
-    "sdk/ts"
+    "plugins/*"
   ],
   "dependencies": {
     "@neoworks/extension-system": "link:@neoworks/extension-system"

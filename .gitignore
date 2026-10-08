@@ -1,30 +1,21 @@
 __pycache__/
 *.pyc
+.pytest_cache/
 .venv/
 venv/
 node_modules/
 dist/
-.atlas/
+build/
+
+# Local data (not part of the repo)
+.atlas-workspace/
 examples/
 dataset/
 /export/
-.svelte-kit/
-build/
-
-# VLM models (removed) / large binaries
 models/
 *.gguf
 
-# Go
-/backend/atlas
-/backend/tmp/
-*.test
-
-# SurrealDB local data
+# Old SurrealDB data, kept locally for `migrate`
 .data/
 *.db/
 surreal.log
-
-# rewrite
-packages/*/node_modules/
-.atlas-workspace/
