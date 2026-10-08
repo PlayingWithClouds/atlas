@@ -44,11 +44,15 @@ async function embedAtoms(
   projectId: string,
   atoms: SpanPlan[],
   location: MediaLocation,
+  onProgress: (done: number, total: number) => void,
 ): Promise<Set<string>> {
   const embedded = new Set<string>();
+  let done = 0;
   for (const batch of batchesOf(atoms, EMBED_BATCH_SIZE)) {
     const refs = await embedDescriptors(provider, projectId, batch.map((atom) => descriptorOf(atom, location)));
     refs.forEach((ref) => embedded.add(ref));
+    done += batch.length;
+    onProgress(done, atoms.length);
   }
   return embedded;
 }
@@ -63,19 +67,19 @@ export async function compareAtoms(
   projectId: string,
   atoms: SpanPlan[],
   location: MediaLocation,
-  onScored: (scored: number, total: number) => void,
+  onProgress: (scored: number, total: number) => void,
 ): Promise<AtomComparison> {
   const none = { scores: [], embeddedRefs: new Set<string>() };
   if (provider === undefined) {
     return { ...none, note: "no model plugin, so similar neighbours were not merged" };
   }
-  const embeddedRefs = await embedAtoms(provider, projectId, atoms, location);
+  const embeddedRefs = await embedAtoms(provider, projectId, atoms, location, onProgress);
   if (embeddedRefs.size < atoms.length) {
     return { ...none, embeddedRefs, note: "clips could not be embedded, so similar neighbours were not merged" };
   }
   try {
     const refs = atoms.map((atom) => atom.ref);
-    const scores = await similarityChain(provider, projectId, refs, (scored) => onScored(scored, atoms.length - 1));
+    const scores = await similarityChain(provider, projectId, refs, (scored) => onProgress(scored, atoms.length - 1));
     return { scores, embeddedRefs, note: "" };
   } catch (error) {
     return { ...none, embeddedRefs, note: "clips could not be compared, so similar neighbours were not merged" };
