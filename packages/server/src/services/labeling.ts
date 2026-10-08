@@ -4,9 +4,10 @@ import { classNamesOf } from "@atlas/contracts";
 import type { Annotation, Item, Project } from "@atlas/contracts";
 import { HttpError } from "@atlas/contracts/server";
 import type { LabelingService, ModelProvider } from "@atlas/contracts/server";
+import { describeItems } from "./media";
 
 export class LabelingCore extends Service implements LabelingService {
-  static inject = ["items", "projects", "models", "primitives", "notifications"];
+  static inject = ["items", "projects", "models", "primitives", "notifications", "sources"];
 
   constructor(ctx: Context) {
     super(ctx, "labeling");
@@ -136,10 +137,28 @@ export class LabelingCore extends Service implements LabelingService {
       return;
     }
     const examples = items.map((item) => ({ ref: item.ref, labels: this.labelsOf(item) }));
+    await this.embedMissing(provider, project, items);
     try {
       await provider.train(project.id, examples, classNamesOf(project.config));
     } catch (error) {
       this.reportTrainingFailure(project, error);
+    }
+  }
+
+  /** Providers only train on vectors they already hold, so unembedded labeled items are embedded first. */
+  private async embedMissing(provider: ModelProvider, project: Project, items: Item[]): Promise<void> {
+    const missing = items.filter((item) => !item.embedded);
+    if (missing.length === 0) {
+      return;
+    }
+    try {
+      const descriptors = await describeItems(this.ctx.sources, missing);
+      const result = await provider.embed(project.id, descriptors);
+      const embeddedRefs = new Set(result.embedded);
+      const embeddedIds = missing.filter((item) => embeddedRefs.has(item.ref)).map((item) => item.id);
+      this.ctx.items.setEmbedded(embeddedIds, true);
+    } catch (error) {
+      // Training still runs on whatever the provider already holds.
     }
   }
 
