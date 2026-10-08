@@ -60,3 +60,23 @@ test("removing a session cascades and emits events; labeledInProject joins sessi
   expect(items.get(item.id)).toBeUndefined();
   await host.stop();
 });
+
+test("compact renumbers idx to 0..n-1 in order and later appends continue after it", async () => {
+  const { host, items, session } = await setup();
+  const added = items.append(
+    session.id,
+    ["a", "b", "c", "d", "e"].map((ref) => ({ ref, mediaKind: "m" })),
+  );
+  items.remove(added[1].id);
+  items.remove(added[3].id);
+  items.compact(session.id);
+  expect(items.list(session.id).map((item) => [item.ref, item.index])).toEqual([
+    ["a", 0],
+    ["c", 1],
+    ["e", 2],
+  ]);
+  expect(items.append(session.id, [{ ref: "f", mediaKind: "m" }])[0].index).toBe(3);
+  items.compact(session.id);
+  expect(items.list(session.id).map((item) => item.index)).toEqual([0, 1, 2, 3]);
+  await host.stop();
+});

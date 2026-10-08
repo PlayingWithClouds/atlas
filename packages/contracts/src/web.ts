@@ -59,12 +59,28 @@ export interface GridLabelerContribution {
   component: Component<{ project: Project; session: Session }>;
 }
 
+/** Response of `GET /api/items/:id`: the item plus the model's current opinion of it. */
+export interface ItemDetail {
+  item: Item;
+  suggestions: Record<string, number>;
+  threshold: number;
+}
+
 /** Focused view for one item. */
 export interface ItemLabelerContribution {
   id: string;
   priority: number;
   matches(project: Project, item: Item): boolean;
-  component: Component<{ project: Project; session: Session; item: Item }>;
+  /** `detail` is the already-fetched `GET /api/items/:id` response; labelers should not refetch it. */
+  component: Component<{ project: Project; session: Session; item: Item; detail?: ItemDetail }>;
+}
+
+/** Tools shown under the media of an item labeler (e.g. a trim bar), keyed by media kind. */
+export interface MediaToolContribution {
+  id: string;
+  mediaKind: string;
+  order: number;
+  component: Component<{ item: Item; session: Session; project: Project }>;
 }
 
 /** Renders one item inside generic grids, keyed by media kind. */
@@ -170,6 +186,7 @@ declare module "@neoworks/extension-system" {
     gridLabelers: Registry<GridLabelerContribution>;
     itemLabelers: Registry<ItemLabelerContribution>;
     mediaCells: Registry<MediaCellContribution>;
+    mediaTools: Registry<MediaToolContribution>;
     annotationTools: Registry<AnnotationToolContribution>;
     sourcePickers: Registry<SourcePickerContribution>;
     projectTemplates: Registry<ProjectTemplateContribution>;

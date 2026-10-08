@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Item, Project, Session } from '@atlas/contracts';
+	import type { ItemDetail } from '@atlas/contracts/web';
 	import { Key, TagGrid } from '@atlas/web/components';
 	import { kernelContext } from '@atlas/web/kernel';
 	import { onMount } from 'svelte';
@@ -17,7 +18,12 @@
 	} from './labelApi';
 	import { annotationsWithTags, classNamesOfGroups, initialSelection, recallTags, rememberTags, tagsOf } from './itemTags';
 
-	let { project, session, item }: { project: Project; session: Session; item: Item } = $props();
+	let {
+		project,
+		session,
+		item,
+		detail: preloadedDetail
+	}: { project: Project; session: Session; item: Item; detail?: ItemDetail } = $props();
 
 	const ctx = kernelContext();
 	const DEFAULT_THRESHOLD = 0.5;
@@ -34,6 +40,12 @@
 	const groups = $derived(project.config.labels.groups);
 	const classNames = $derived(classNamesOfGroups(groups));
 	const cell = $derived(ctx.mediaCells.list().find((candidate) => candidate.mediaKind === item.mediaKind));
+	const tools = $derived(
+		ctx.mediaTools
+			.list()
+			.filter((tool) => tool.mediaKind === item.mediaKind)
+			.sort((left, right) => left.order - right.order)
+	);
 	const position = $derived(orderedIds.indexOf(item.id));
 	const topSuggestions = $derived(
 		Object.entries(suggestions)
@@ -60,7 +72,7 @@
 		selected = new Set(tagsOf(current));
 		suggestions = {};
 		try {
-			const detail = await describeItem(ctx.api, current.id);
+			const detail = await detailFor(current);
 			if (detail.item.id !== item.id) return;
 			suggestions = detail.suggestions;
 			threshold = detail.threshold;
@@ -68,6 +80,14 @@
 		} catch (failure) {
 			failWith(failure);
 		}
+	}
+
+	// The item page already fetched this item; only fetch when it did not.
+	async function detailFor(current: Item): Promise<ItemDetail> {
+		if (preloadedDetail !== undefined && preloadedDetail.item.id === current.id) {
+			return preloadedDetail;
+		}
+		return describeItem(ctx.api, current.id);
 	}
 
 	function failWith(failure: unknown) {
@@ -221,6 +241,13 @@
 					{/if}
 				{/key}
 			</div>
+			{#each tools as tool (tool.id)}
+				{#key item.id}
+					<div class="border-line border-t px-4 py-3">
+						<tool.component {item} {session} {project} />
+					</div>
+				{/key}
+			{/each}
 		</div>
 
 		<div class="border-line bg-elevated flex w-[46vw] max-w-[760px] min-w-[420px] shrink-0 flex-col border-l">

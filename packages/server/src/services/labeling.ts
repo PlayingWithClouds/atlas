@@ -132,8 +132,12 @@ export class LabelingCore extends Service implements LabelingService {
   }
 
   private async trainQuietly(project: Project, items: Item[]): Promise<void> {
+    if (!this.isTrainable(project) || items.length === 0) {
+      return;
+    }
     const provider = this.ctx.models.get(project.config.model);
-    if (!provider || !this.isTrainable(project) || items.length === 0) {
+    if (!provider) {
+      this.reportTrainingFailure(project, new Error(`model provider "${project.config.model}" is not loaded`));
       return;
     }
     const examples = items.map((item) => ({ ref: item.ref, labels: this.labelsOf(item) }));

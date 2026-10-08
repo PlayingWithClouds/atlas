@@ -175,6 +175,8 @@ export interface ItemsService {
   setEmbedded(itemIds: string[], embedded: boolean): void;
   setSpan(itemId: string, span: Span): Item;
   remove(itemId: string): void;
+  /** Renumbers idx to 0..n-1 keeping order, closing gaps left by removals. */
+  compact(sessionId: string): void;
   /** Labeled items across every session of a project, for training and export. */
   labeledInProject(projectId: string): Item[];
 }

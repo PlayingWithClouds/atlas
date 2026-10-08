@@ -123,3 +123,21 @@ test("confirm embeds an unembedded item before training and marks it embedded", 
   expect(host.context.items.get(item.id)?.embedded).toBe(true);
   await host.stop();
 });
+
+test("confirm with an unloaded model still labels and reports the missing provider", async () => {
+  const host = await startHost();
+  await mountProviders(host, { primitive: fakePrimitive });
+  const project = host.context.projects.create("p", projectConfig({ model: "absent-model" }));
+  const session = host.context.items.createSession({
+    projectId: project.id,
+    label: "s",
+    source: { plugin: "x", kind: "k", params: {} },
+  });
+  const [item] = host.context.items.append(session.id, [{ ref: "a", mediaKind: "m" }]);
+  const labeled = await host.context.labeling.confirm(item.id, [{ type: "fake-tag", value: { classes: ["b"] } }]);
+  expect(labeled.status).toBe("labeled");
+  const notifications = host.context.notifications.list();
+  expect(notifications).toHaveLength(1);
+  expect(notifications[0].message).toContain('"absent-model" is not loaded');
+  await host.stop();
+});
