@@ -1,0 +1,27 @@
+{
+  "name": "@atlas/plugin-assistant",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "atlas": {
+    "server": "./src/server.ts",
+    "web": "./src/web.ts"
+  },
+  "exports": {
+    "./types": "./src/types.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check:web": "svelte-check --tsconfig ./tsconfig.web.json"
+  },
+  "dependencies": {
+    "@atlas/contracts": "workspace:*",
+    "@atlas/web": "workspace:*",
+    "@neoworks/extension-system": "link:@neoworks/extension-system",
+    "marked": "^18.0.7",
+    "phosphor-svelte": "^3.0.0"
+  },
+  "devDependencies": {
+    "svelte": "^5.19.0"
+  }
+}

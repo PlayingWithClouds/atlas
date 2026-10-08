@@ -1,0 +1,17 @@
+{
+  "name": "@atlas/plugin-assistant-ollama",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "atlas": {
+    "server": "./src/server.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@atlas/contracts": "workspace:*",
+    "@atlas/plugin-assistant": "workspace:*",
+    "@neoworks/extension-system": "link:@neoworks/extension-system"
+  }
+}

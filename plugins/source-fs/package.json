@@ -1,0 +1,24 @@
+{
+  "name": "@atlas/plugin-source-fs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "atlas": {
+    "server": "./src/server.ts",
+    "web": "./src/web.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check:web": "svelte-check --tsconfig ./tsconfig.web.json"
+  },
+  "dependencies": {
+    "@atlas/contracts": "workspace:*",
+    "@atlas/server": "workspace:*",
+    "@neoworks/extension-system": "link:@neoworks/extension-system",
+    "@atlas/web": "workspace:*",
+    "phosphor-svelte": "^3.0.0"
+  },
+  "devDependencies": {
+    "svelte": "^5.19.0"
+  }
+}

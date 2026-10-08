@@ -2,7 +2,20 @@
   "name": "atlas",
   "private": true,
   "workspaces": [
-    "sdk/ts",
-    "plugins/veil"
-  ]
+    "packages/*",
+    "plugins/*"
+  ],
+  "dependencies": {
+    "@neoworks/extension-system": "link:@neoworks/extension-system"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "test": "bun test packages/web tests/server plugins",
+    "check": "./scripts/check.sh",
+    "dev": "process-compose up -U",
+    "init": "bun packages/server/src/main.ts init ${ATLAS_WORKSPACE:-.atlas-workspace}"
+  }
 }

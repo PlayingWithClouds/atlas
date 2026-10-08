@@ -1,0 +1,16 @@
+{
+  "name": "@atlas/plugin-core-nodes",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "atlas": {
+    "server": "./src/server.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@atlas/contracts": "workspace:*",
+    "@neoworks/extension-system": "link:@neoworks/extension-system"
+  }
+}
