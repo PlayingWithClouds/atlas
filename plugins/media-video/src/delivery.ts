@@ -7,7 +7,7 @@ import {
   PASS_THROUGH_RESPONSE_HEADERS,
   boundedRange,
   ignoresRanges,
-  isHlsUrl,
+  isHlsLocation,
   isStaleStatus,
   parseSingleRange,
 } from "./range";
@@ -202,7 +202,7 @@ function describeFailure(attempt: ProxyAttempt): string {
 }
 
 function requirePlayableUrl(location: UrlLocation): void {
-  if (isHlsUrl(location.url)) {
+  if (isHlsLocation(location)) {
     throw new HttpError(415, "HLS source: play clips via /api/items/:id/clip");
   }
 }

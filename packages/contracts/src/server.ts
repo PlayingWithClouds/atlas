@@ -186,7 +186,13 @@ export interface ItemsService {
 /** How a worker or the browser can read an item's bytes. */
 export type MediaLocation =
   | { kind: "file"; path: string }
-  | { kind: "url"; url: string; headers?: Record<string, string> };
+  | {
+      kind: "url";
+      url: string;
+      headers?: Record<string, string>;
+      /** Container hint for decoders when the URL does not reveal it, e.g. "hls" for a proxied playlist. */
+      format?: string;
+    };
 
 export interface SourceKind {
   id: string;
