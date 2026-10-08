@@ -15,6 +15,8 @@ import PrimitivesCore from "./services/primitives";
 import ProjectsCore from "./services/projects";
 import PythonRuntime from "./python/service";
 import SourcesCore from "./services/sources";
+import ToolsCore from "./services/tools";
+import WorkflowsCore from "./services/workflows";
 import WorkspaceCore from "./services/workspace";
 
 export interface HostOptions {
@@ -51,6 +53,8 @@ async function mountCoreServices(context: Context, options: HostOptions, mounted
     [SourcesCore, undefined],
     [LabelingCore, undefined],
     [DomainRoutes, undefined],
+    [WorkflowsCore, undefined],
+    [ToolsCore, undefined],
     [PythonRuntime, undefined],
     [PluginsCore, undefined],
   ];

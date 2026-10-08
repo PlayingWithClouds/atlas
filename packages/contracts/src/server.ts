@@ -331,7 +331,14 @@ export interface NodeRunContext {
   job: JobHandle;
   /** Items produced by each upstream node, in edge order. */
   inputs: WorkItem[][];
+  /** Fresh snapshot of every item in the session; the entry point for nodes with input "none". */
+  sessionItems(): WorkItem[];
+  /** Set when an item-scoped trigger started the run; the id of the item that fired it. */
+  scopedItemId?: string;
 }
+
+/** What a node's optional `dryRun` hook sees: the run context minus anything that implies work. */
+export type NodeDryRunContext = Omit<NodeRunContext, "job" | "inputs">;
 
 export interface NodeResult {
   items: WorkItem[];
@@ -340,6 +347,11 @@ export interface NodeResult {
 
 export interface NodeType extends NodeSpec {
   run(items: WorkItem[], context: NodeRunContext): Promise<NodeResult>;
+  /**
+   * Pure simulation of the node's effect on the item stream, used by dry runs. Nodes without it
+   * are assumed to pass their matching items through; `run` is never called during a dry run.
+   */
+  dryRun?(items: WorkItem[], context: NodeDryRunContext): WorkItem[];
 }
 
 export interface TriggerEvent {
@@ -449,5 +461,9 @@ declare module "@neoworks/extension-system" {
     "session/created"(session: Session): void;
     "session/removed"(sessionId: string): void;
     "project/changed"(project: Project): void;
+    "session/opened"(session: Session): void;
+    "session/closed"(session: Session): void;
+    "item/opened"(item: Item): void;
+    "item/rejected"(item: Item): void;
   }
 }
