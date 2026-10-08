@@ -26,6 +26,14 @@
         "svelte": "^5.19.0",
       },
     },
+    "packages/server": {
+      "name": "@atlas/server",
+      "version": "0.0.0",
+      "dependencies": {
+        "@atlas/contracts": "workspace:*",
+        "@neoworks/extension-system": "link:@neoworks/extension-system",
+      },
+    },
     "plugins/veil": {
       "name": "@atlas/plugin-veil",
       "dependencies": {
@@ -43,6 +51,8 @@
     "@atlas/plugin-sdk": ["@atlas/plugin-sdk@workspace:sdk/ts"],
 
     "@atlas/plugin-veil": ["@atlas/plugin-veil@workspace:plugins/veil"],
+
+    "@atlas/server": ["@atlas/server@workspace:packages/server"],
 
     "@jridgewell/gen-mapping": ["@jridgewell/gen-mapping@0.3.13", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.0", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="],
 
