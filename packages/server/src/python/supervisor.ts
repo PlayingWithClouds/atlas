@@ -84,13 +84,13 @@ export class WorkerSupervisor {
     }
   }
 
-  /** A timed-out call usually means a stuck thread; the worker prints every stack on SIGUSR1. */
+  /** A timed-out call usually means a stuck thread; the worker writes every stack to cache/worker-stacks.log on SIGUSR1. */
   private dumpStacks(child: ChildHandle, method: string): void {
     if (Date.now() - this.lastStackDump < STACK_DUMP_INTERVAL_MS || child.process.exitCode !== null) {
       return;
     }
     this.lastStackDump = Date.now();
-    this.logger.error(`"${method}" timed out; dumping worker stacks`);
+    this.logger.error(`"${method}" timed out; worker stacks written to cache/worker-stacks.log`);
     child.process.kill("SIGUSR1");
   }
 

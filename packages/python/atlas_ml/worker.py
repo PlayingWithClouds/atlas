@@ -146,14 +146,14 @@ class Worker:
     def error_response(self, request_id, code: int, message: str) -> dict:
         return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
 
-    def handle_request(self, request: dict) -> None:
-        key = self.watchdog.begin(request["method"])
+    def handle_request(self, request: dict, watch_key: int) -> None:
+        """`watch_key` was taken on receipt, so time queued behind busy threads counts as stuck too."""
         try:
             response = self.build_response(request)
+            if "id" in request:
+                self.write(response)
         finally:
-            self.watchdog.end(key)
-        if "id" in request:
-            self.write(response)
+            self.watchdog.end(watch_key)
 
     def write(self, message: dict) -> None:
         line = json.dumps(message, default=to_json_value)
@@ -170,7 +170,8 @@ class Worker:
         if not isinstance(request, dict) or "method" not in request:
             self.write(self.error_response(None, INVALID_REQUEST, "invalid request"))
             return
-        self.executor_for(request["method"]).submit(self.handle_request, request)
+        watch_key = self.watchdog.begin(request["method"])
+        self.executor_for(request["method"]).submit(self.handle_request, request, watch_key)
 
     def executor_for(self, method: str) -> ThreadPoolExecutor:
         if method in HEAVY_METHODS:
@@ -218,8 +219,10 @@ def resolve_device(requested: str) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = parse_arguments(argv)
-    # `kill -USR1 <pid>` dumps every thread's stack to stderr, which the host logs.
-    faulthandler.register(signal.SIGUSR1, all_threads=True)
+    # `kill -USR1 <pid>` dumps every thread's stack into the cache root, readable even if stderr is wedged.
+    os.makedirs(arguments.cache_root, exist_ok=True)
+    stack_file = open(os.path.join(arguments.cache_root, "worker-stacks.log"), "a")
+    faulthandler.register(signal.SIGUSR1, file=stack_file, all_threads=True)
     worker = Worker(arguments.module, arguments.cache_root, resolve_device(arguments.device))
     worker.serve()
     return 0

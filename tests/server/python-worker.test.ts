@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Context } from "@neoworks/extension-system";
@@ -47,9 +48,9 @@ function processIdOf(worker: PythonWorker): number {
 
 const fibers: Fiber[] = [];
 
-function createRoot(): Context {
+function createRoot(directory = makeTempDirectory("atlas-python-")): Context {
   const root = new Context();
-  root.provide("workspace", stubWorkspace(makeTempDirectory("atlas-python-")));
+  root.provide("workspace", stubWorkspace(directory));
   root.plugin(PythonRuntime);
   return root;
 }
@@ -114,14 +115,13 @@ describeWithPython("python worker", () => {
     await rejection;
   });
 
-  test("a timed-out call makes the worker print its thread stacks", async () => {
-    const root = createRoot();
-    const lines: string[] = [];
-    root.logger.exporter({ export: (message) => lines.push(message.args.map(String).join(" ")) });
-    const { worker } = await mount(root, "slow_encoder");
+  test("a timed-out call makes the worker write its thread stacks to the cache", async () => {
+    const directory = makeTempDirectory("atlas-python-");
+    const { worker } = await mount(createRoot(directory), "slow_encoder");
     const item = { ref: "a", mediaKind: "image", location: { kind: "file", path: "a" } };
     await expect(worker.call("embed", { projectId: "p", items: [item] }, { timeoutMs: 300 })).rejects.toThrow("timed out");
-    await waitFor(() => lines.some((line) => line.includes("most recent call first")), 5000);
+    const stackFile = path.join(directory, "cache", "worker-stacks.log");
+    await waitFor(() => fs.existsSync(stackFile) && fs.readFileSync(stackFile, "utf8").includes("most recent call first"), 5000);
   });
 
   test("restarts after the child is killed", async () => {
