@@ -49,6 +49,7 @@ async function changeSpan(ctx: Context, request: Request, itemId: string): Promi
 
 async function describeItemForClient(ctx: Context, itemId: string) {
   const item = requireItem(ctx, itemId);
+  ctx.emit("item/opened", item);
   const suggestions = await ctx.labeling.suggestions(item);
   return { item, suggestions, threshold: SUGGESTION_THRESHOLD };
 }
@@ -78,7 +79,11 @@ export function registerItemRoutes(ctx: Context): void {
     return ctx.labeling.confirm(params.id, parseAnnotations(body.annotations));
   });
 
-  addRoute(ctx, "POST", "/api/items/:id/skip", (_request, params) => ctx.labeling.skip(params.id));
+  addRoute(ctx, "POST", "/api/items/:id/skip", (_request, params) => {
+    const skipped = ctx.labeling.skip(params.id);
+    ctx.emit("item/rejected", skipped);
+    return skipped;
+  });
 
   addRoute(ctx, "DELETE", "/api/items/:id", async (_request, params) => {
     const item = requireItem(ctx, params.id);

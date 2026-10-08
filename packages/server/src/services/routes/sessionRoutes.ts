@@ -153,6 +153,19 @@ async function searchSession(ctx: Context, request: Request, sessionId: string) 
   return hits.map((hit) => ({ itemId: idByRef.get(hit.ref), score: hit.score }));
 }
 
+async function nextItemAndAnnounce(ctx: Context, sessionId: string) {
+  const result = await ctx.labeling.next(sessionId);
+  if (result.item) {
+    ctx.emit("item/opened", result.item);
+  }
+  return result;
+}
+
+function emitSessionEvent(ctx: Context, event: "session/opened" | "session/closed", sessionId: string) {
+  ctx.emit(event, requireSession(ctx, sessionId));
+  return { ok: true };
+}
+
 export function registerSessionRoutes(ctx: Context): void {
   addRoute(ctx, "POST", "/api/sessions", (request) => openSession(ctx, request));
 
@@ -168,7 +181,11 @@ export function registerSessionRoutes(ctx: Context): void {
     return { ok: true };
   });
 
-  addRoute(ctx, "GET", "/api/sessions/:id/next", (_request, params) => ctx.labeling.next(params.id));
+  addRoute(ctx, "POST", "/api/sessions/:id/opened", (_request, params) => emitSessionEvent(ctx, "session/opened", params.id));
+
+  addRoute(ctx, "POST", "/api/sessions/:id/closed", (_request, params) => emitSessionEvent(ctx, "session/closed", params.id));
+
+  addRoute(ctx, "GET", "/api/sessions/:id/next", (_request, params) => nextItemAndAnnounce(ctx, params.id));
 
   addRoute(ctx, "GET", "/api/sessions/:id/items", (request, params) => listSessionItems(ctx, request, params.id));
 
