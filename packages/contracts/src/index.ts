@@ -36,6 +36,7 @@ export interface Item {
   annotations: Annotation[];
   embedded: boolean;
   span?: Span;
+  /** Plugin-owned per-item data. `meta.source` overrides the session's source provider for locating. */
   meta: Record<string, unknown>;
 }
 

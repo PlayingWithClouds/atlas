@@ -42,9 +42,18 @@ export class SourcesCore extends Service implements SourcesService {
     if (!session) {
       throw new HttpError(404, "session not found");
     }
-    const provider = this.require(session.source.plugin);
+    const provider = this.require(providerIdFor(item, session.source.plugin));
     return provider.locate(sourceRefOf(item));
   }
+}
+
+/** Items produced by a plugin other than the session's source (e.g. extracted frames) name their provider in `meta.source`. */
+function providerIdFor(item: Item, sessionProviderId: string): string {
+  const overrideId = item.meta.source;
+  if (typeof overrideId === "string") {
+    return overrideId;
+  }
+  return sessionProviderId;
 }
 
 export default SourcesCore;
