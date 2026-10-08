@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["bun", "svelte"],
+    "allowJs": false
+  },
+  "include": ["src/web.ts", "src/web/**/*.ts", "src/web/**/*.svelte", "src/types.ts"]
+}
