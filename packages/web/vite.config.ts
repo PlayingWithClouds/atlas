@@ -4,9 +4,9 @@ import path from 'node:path';
 import { defineConfig } from 'vite';
 import { atlasWorkspacePlugins } from './vite/workspacePlugins';
 
-const workspaceDirectory = path.resolve(
-	process.env.ATLAS_WORKSPACE ?? path.join(import.meta.dirname, '../../.atlas-workspace')
-);
+// Relative ATLAS_WORKSPACE values are relative to the repo root, like the server's.
+const repositoryRoot = path.join(import.meta.dirname, '../..');
+const workspaceDirectory = path.resolve(repositoryRoot, process.env.ATLAS_WORKSPACE ?? '.atlas-workspace');
 const apiTarget = `http://localhost:${process.env.ATLAS_PORT ?? 8123}`;
 
 // The browser talks to the server same-origin: /api (REST + WebSocket) is proxied, so
