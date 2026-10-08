@@ -1,8 +1,0 @@
-{
-  "name": "@atlas/plugin-veil",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@atlas/plugin-sdk": "workspace:*"
-  }
-}

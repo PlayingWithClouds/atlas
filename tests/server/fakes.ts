@@ -102,5 +102,5 @@ export function mountProviders(
     }
   };
   plugin.inject = ["models", "sources", "primitives", "mediaKinds"];
-  return host.context.plugin(plugin as never);
+  return host.context.plugin(plugin as never, undefined as never);
 }
