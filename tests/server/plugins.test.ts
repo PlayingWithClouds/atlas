@@ -32,7 +32,7 @@ function writeTempPlugin(workspaceDirectory: string): void {
 }
 
 function configWith(plugins: unknown[]) {
-  return { title: "t", plugins, workflows: [], settings: {} };
+  return { title: "t", plugins, webhooks: [], tokens: [], settings: {} };
 }
 
 const entry = (config: Record<string, unknown>) => ({ package: "temp-plugin", path: "plugins/temp", config });
@@ -81,12 +81,36 @@ test("saveConfig triggers an automatic reload", async () => {
   await host.stop();
 });
 
-test("a broken plugin is reported, not fatal", async () => {
+test("a plugin whose package is missing is skipped with a warning", async () => {
   const workspaceDirectory = makeTempDirectory();
-  writeAtlasConfig(workspaceDirectory, configWith([{ package: "missing", path: "nope" }]));
+  writeAtlasConfig(workspaceDirectory, configWith([{ package: "@atlas/plugin-assistant", path: "plugins/gone" }, { package: "no-such-package" }]));
+  const host = await startHost(workspaceDirectory);
+  expect(host.context.plugins.list()).toEqual([]);
+  expect((await fetch(urlOf(host, "/api/health"))).status).toBe(200);
+  await host.stop();
+});
+
+test("a plugin that throws is reported as failed, not fatal", async () => {
+  const workspaceDirectory = makeTempDirectory();
+  const pluginDirectory = path.join(workspaceDirectory, "plugins", "broken");
+  fs.mkdirSync(pluginDirectory, { recursive: true });
+  fs.writeFileSync(path.join(pluginDirectory, "package.json"), JSON.stringify({ name: "broken", atlas: { server: "./server.js" } }));
+  fs.writeFileSync(path.join(pluginDirectory, "server.js"), 'export default { name: "broken", apply() { throw new Error("boom"); } };');
+  writeAtlasConfig(workspaceDirectory, configWith([{ package: "broken", path: "plugins/broken" }]));
   const host = await startHost(workspaceDirectory);
   const [view] = host.context.plugins.list();
   expect(view.state).toBe("FAILED");
-  expect(view.error).toBeTruthy();
+  expect(view.error).toContain("boom");
+  await host.stop();
+});
+
+test("a web-only plugin has no server part and stays out of the list", async () => {
+  const workspaceDirectory = makeTempDirectory();
+  const pluginDirectory = path.join(workspaceDirectory, "plugins", "player");
+  fs.mkdirSync(pluginDirectory, { recursive: true });
+  fs.writeFileSync(path.join(pluginDirectory, "package.json"), JSON.stringify({ name: "player", atlas: { web: "./web.ts" } }));
+  writeAtlasConfig(workspaceDirectory, configWith([{ package: "player", path: "plugins/player" }]));
+  const host = await startHost(workspaceDirectory);
+  expect(host.context.plugins.list()).toEqual([]);
   await host.stop();
 });

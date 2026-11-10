@@ -7,7 +7,8 @@ import { atlasWorkspacePlugins } from './vite/workspacePlugins';
 // Relative ATLAS_WORKSPACE values are relative to the repo root, like the server's.
 const repositoryRoot = path.join(import.meta.dirname, '../..');
 const workspaceDirectory = path.resolve(repositoryRoot, process.env.ATLAS_WORKSPACE ?? '.atlas-workspace');
-const apiTarget = `http://localhost:${process.env.ATLAS_PORT ?? 8123}`;
+// ATLAS_API_URL points the proxy elsewhere, e.g. at dev/fakeApi.ts.
+const apiTarget = process.env.ATLAS_API_URL ?? `http://localhost:${process.env.ATLAS_PORT ?? 8123}`;
 
 // The browser talks to the server same-origin: /api (REST + WebSocket) is proxied, so
 // <img src="/api/..."> works with relative URLs and no CORS is involved.

@@ -11,7 +11,7 @@ export class DbCore extends Service implements DbService {
 
   constructor(ctx: Context) {
     super(ctx, "db");
-    this.database = new Database(path.join(ctx.workspace.directory, "atlas.db"), { create: true });
+    this.database = new Database(path.join(ctx.workspace.directory, "store.db"), { create: true });
     this.database.exec("PRAGMA journal_mode = WAL");
     this.database.exec("PRAGMA foreign_keys = ON");
     this.database.exec(

@@ -1,4 +1,6 @@
+import fs from "node:fs";
 import path from "node:path";
+import type { PluginEntry } from "@atlas/contracts";
 import { createHost } from "./host";
 import { ensureWorkspace } from "./services/workspace";
 
@@ -39,6 +41,21 @@ function parseArguments(argv: string[]): CliArguments {
   };
 }
 
+const REPOSITORY_ROOT = path.resolve(import.meta.dirname, "../../..");
+const BUNDLED_PLUGINS = ["media-image", "media-video"];
+
+/** The web-side media players that ship in this repository, so a fresh workspace can show media. */
+function bundledPlugins(): PluginEntry[] {
+  const entries: PluginEntry[] = [];
+  for (const name of BUNDLED_PLUGINS) {
+    const directory = path.join(REPOSITORY_ROOT, "plugins", name);
+    if (fs.existsSync(path.join(directory, "package.json"))) {
+      entries.push({ package: `@atlas/plugin-${name}`, path: directory, enabled: true });
+    }
+  }
+  return entries;
+}
+
 async function serve(workspaceDirectory: string, port: number | undefined): Promise<void> {
   const host = await createHost({ workspaceDirectory, port, logToConsole: true });
   console.log(`atlas serving ${workspaceDirectory} on http://localhost:${host.context.http.port}`);
@@ -51,10 +68,6 @@ async function serve(workspaceDirectory: string, port: number | undefined): Prom
 }
 
 async function main(): Promise<void> {
-  if (process.argv[2] === "migrate") {
-    const { migrateCommand } = await import("./migrate/cli");
-    process.exit(await migrateCommand(process.argv.slice(3)));
-  }
   const args = parseArguments(process.argv.slice(2));
   if (!args.workspaceDirectory) {
     console.error("usage: main.ts [init] <workspaceDir> [--port N]");
@@ -62,7 +75,7 @@ async function main(): Promise<void> {
   }
   const workspaceDirectory = path.resolve(args.workspaceDirectory);
   if (args.command === "init") {
-    ensureWorkspace(workspaceDirectory);
+    ensureWorkspace(workspaceDirectory, bundledPlugins());
     console.log(`initialized ${workspaceDirectory}`);
     return;
   }

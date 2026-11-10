@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "vite dev",
+    "dev:fake": "bun dev/fakeApi.ts",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
@@ -18,7 +19,6 @@
     "@atlas/contracts": "workspace:*",
     "@fontsource-variable/geist": "^5.1.0",
     "@neoworks/extension-system": "link:@neoworks/extension-system",
-    "marked": "^18.0.7",
     "phosphor-svelte": "^3.0.0"
   },
   "devDependencies": {

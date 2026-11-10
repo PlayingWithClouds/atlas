@@ -5,7 +5,7 @@
  */
 
 import type { Component } from "svelte";
-import type { Item, NodeParam, NodeSpec, Project, Session } from "./index";
+import type { Asset, AssetKind, Span } from "./schema";
 
 export type Dispose = () => void;
 
@@ -27,16 +27,18 @@ export interface ApiClient {
 
 export interface RouteContribution {
   id: string;
-  /** `:name` segments, e.g. `/projects/:project/session/:session`. */
+  /** `:name` segments, e.g. `/projects/:project/label/:item`. */
   path: string;
   component: Component<{ params: Record<string, string> }>;
+  /** Hides the navigation rail so the page gets the whole window (the labeling screen). */
+  focus?: boolean;
 }
 
 export interface NavContribution {
   id: string;
   label: string;
   icon?: Component;
-  /** Project-relative path, e.g. "data"; the shell prefixes `/projects/:project/`. */
+  /** Project-relative path, e.g. "queue"; the shell prefixes `/projects/:project/`. */
   path: string;
   order: number;
 }
@@ -50,126 +52,47 @@ export interface CommandContribution {
   when?(): boolean;
 }
 
-/** Workspace that labels a whole session (grid, region canvas, ...). */
-export interface GridLabelerContribution {
-  id: string;
-  /** Higher wins when several match. */
-  priority: number;
-  matches(project: Project): boolean;
-  component: Component<{ project: Project; session: Session }>;
+/**
+ * What the labeling screen can do with a player. Times are seconds into the asset, never
+ * relative to the item. Players for still images implement it as no-ops.
+ */
+export interface PlayerHandle {
+  readonly currentTime: number;
+  readonly paused: boolean;
+  readonly muted: boolean;
+  readonly playbackRate: number;
+  play(): void;
+  pause(): void;
+  seek(seconds: number): void;
+  setMuted(muted: boolean): void;
+  setPlaybackRate(rate: number): void;
 }
 
-/** Response of `GET /api/items/:id`: the item plus the model's current opinion of it. */
-export interface ItemDetail {
-  item: Item;
-  suggestions: Record<string, number>;
-  threshold: number;
+export interface MediaPlayerProps {
+  asset: Asset;
+  /** The window to play and loop; the whole asset when absent. */
+  span?: Span;
+  /** Still shown before playback (the item's own poster); falls back to the asset's. */
+  poster?: string;
+  /** Called once the handle is usable. */
+  onready?(handle: PlayerHandle): void;
+  /** Called while the playhead moves and after seeks, with asset seconds. */
+  ontime?(seconds: number): void;
 }
 
-/** Focused view for one item. */
-export interface ItemLabelerContribution {
-  id: string;
-  priority: number;
-  matches(project: Project, item: Item): boolean;
-  /** `detail` is the already-fetched `GET /api/items/:id` response; labelers should not refetch it. */
-  component: Component<{ project: Project; session: Session; item: Item; detail?: ItemDetail }>;
+/** Props of a hover-preview cell used in grids: poster until hovered, then a muted loop. */
+export interface MediaPreviewProps {
+  asset: Asset;
+  span?: Span;
+  poster?: string;
 }
 
-/** Tools shown under the media of an item labeler (e.g. a trim bar), keyed by media kind. */
-export interface MediaToolContribution {
+/** The player and the grid preview for one asset kind. */
+export interface MediaPlayerContribution {
   id: string;
-  mediaKind: string;
-  order: number;
-  component: Component<{ item: Item; session: Session; project: Project }>;
-}
-
-/** Renders one item inside generic grids, keyed by media kind. */
-export interface MediaCellContribution {
-  id: string;
-  mediaKind: string;
-  component: Component<{ item: Item; session: Session; active: boolean }>;
-}
-
-/** Drawing / editing tool for one annotation primitive. */
-export interface AnnotationToolContribution {
-  id: string;
-  primitive: string;
-  label: string;
-  hotkey?: string;
-  component: Component<{ project: Project; item: Item }>;
-}
-
-/** UI for browsing and opening one source kind. */
-export interface SourcePickerContribution {
-  id: string;
-  /** `<source provider id>:<kind id>`. */
-  sourceKind: string;
-  component: Component<{ project: Project; open(params: Record<string, unknown>): Promise<void> }>;
-}
-
-/** Preset offered when creating a project. */
-export interface ProjectTemplateContribution {
-  id: string;
-  label: string;
-  description: string;
-  config: Partial<Project["config"]>;
-}
-
-export interface SettingsPaneContribution {
-  id: string;
-  label: string;
-  order: number;
-  component: Component<{ project: Project }>;
-}
-
-export interface InsightsViewContribution {
-  id: string;
-  label: string;
-  order: number;
-  component: Component<{ project: Project }>;
-}
-
-export interface OverviewWidgetContribution {
-  id: string;
-  order: number;
-  component: Component<{ project: Project }>;
-}
-
-export interface ParamEditorContribution {
-  id: string;
-  kind: NodeParam["kind"];
-  component: Component<{ param: NodeParam; value: unknown; change(value: unknown): void }>;
-}
-
-export interface NodePresentationContribution {
-  id: string;
-  /** Node type this styles. */
-  nodeType: string;
-  icon?: Component;
-  color?: string;
-  /** Replaces the default param form. */
-  editor?: Component<{ spec: NodeSpec; params: Record<string, unknown>; change(params: Record<string, unknown>): void }>;
-}
-
-export interface ToolbarActionContribution {
-  id: string;
-  label: string;
-  icon?: Component;
-  order: number;
-  when(project: Project, session: Session): boolean;
-  run(project: Project, session: Session, selectedItems: Item[]): void | Promise<void>;
-}
-
-export interface JobRendererContribution {
-  id: string;
-  jobType: string;
-  label: string;
-}
-
-export interface LiveHandlerContribution {
-  id: string;
-  messageType: string;
-  handle(message: Record<string, unknown>): void;
+  kind: AssetKind;
+  player: Component<MediaPlayerProps>;
+  preview: Component<MediaPreviewProps>;
 }
 
 export interface Toasts {
@@ -183,20 +106,6 @@ declare module "@neoworks/extension-system" {
     routes: Registry<RouteContribution>;
     nav: Registry<NavContribution>;
     commands: Registry<CommandContribution>;
-    gridLabelers: Registry<GridLabelerContribution>;
-    itemLabelers: Registry<ItemLabelerContribution>;
-    mediaCells: Registry<MediaCellContribution>;
-    mediaTools: Registry<MediaToolContribution>;
-    annotationTools: Registry<AnnotationToolContribution>;
-    sourcePickers: Registry<SourcePickerContribution>;
-    projectTemplates: Registry<ProjectTemplateContribution>;
-    settingsPanes: Registry<SettingsPaneContribution>;
-    insightsViews: Registry<InsightsViewContribution>;
-    overviewWidgets: Registry<OverviewWidgetContribution>;
-    paramEditors: Registry<ParamEditorContribution>;
-    nodePresentations: Registry<NodePresentationContribution>;
-    toolbarActions: Registry<ToolbarActionContribution>;
-    jobRenderers: Registry<JobRendererContribution>;
-    liveHandlers: Registry<LiveHandlerContribution>;
+    mediaPlayers: Registry<MediaPlayerContribution>;
   }
 }

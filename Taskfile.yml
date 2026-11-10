@@ -27,16 +27,16 @@ tasks:
       - bun run dev
 
   test:
-    desc: Run server, plugin and web tests
+    desc: Run contracts, server, plugin and web tests
     cmds:
-      - bun test packages/web tests/server plugins
+      - bun test packages/web tests/contracts tests/server plugins
 
   check:
-    desc: Typecheck server/contracts/plugins and svelte-check web + plugin web configs
+    desc: Typecheck contracts, server and plugins; svelte-check web + plugin web configs
     cmds:
       - ./scripts/check.sh
 
   init:
-    desc: Create the workspace directory ($ATLAS_WORKSPACE, default .atlas-workspace)
+    desc: Create the workspace directory ($ATLAS_WORKSPACE, default .atlas-workspace) with a starter atlas.json
     cmds:
       - bun packages/server/src/main.ts init "$ATLAS_WORKSPACE"

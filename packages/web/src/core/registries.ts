@@ -1,26 +1,7 @@
 import type { Context } from '@neoworks/extension-system';
 import { createRegistry } from '../kernel/registry.svelte';
 
-const REGISTRY_KEYS = [
-  'routes',
-  'nav',
-  'commands',
-  'gridLabelers',
-  'itemLabelers',
-  'mediaCells',
-  'mediaTools',
-  'annotationTools',
-  'sourcePickers',
-  'projectTemplates',
-  'settingsPanes',
-  'insightsViews',
-  'overviewWidgets',
-  'paramEditors',
-  'nodePresentations',
-  'toolbarActions',
-  'jobRenderers',
-  'liveHandlers',
-] as const;
+const REGISTRY_KEYS = ['routes', 'nav', 'commands', 'mediaPlayers'] as const;
 
 /** Provides every contribution registry as a plain object (rune-backed, so not a Service). */
 export const registriesPlugin = {

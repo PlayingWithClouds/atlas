@@ -25,6 +25,15 @@ describe('createApiClient', () => {
     expect(failure.status).toBe(404);
   });
 
+  test('keeps every problem of a 422 answer', async () => {
+    const body = { errors: ['group "a" is defined twice', 'hotkey "x" is used twice'] };
+    const client = createApiClient(fakeFetch(Response.json(body, { status: 422 })));
+    const failure = (await client.put('/projects/p/taxonomy', {}).catch((error: unknown) => error)) as ApiError;
+    expect(failure.status).toBe(422);
+    expect(failure.problems).toEqual(body.errors);
+    expect(failure.message).toBe('group "a" is defined twice; hotkey "x" is used twice');
+  });
+
   test('falls back to the status text without a detail', async () => {
     const response = new Response('oops', { status: 500, statusText: 'Internal Server Error' });
     const failure = (await createApiClient(fakeFetch(response)).get('/x').catch((error: unknown) => error)) as ApiError;

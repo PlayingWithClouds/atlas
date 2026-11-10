@@ -18,7 +18,13 @@
 	provideKernelContext(kernel);
 
 	const current = $derived(kernel.router.current);
-	const projectId = $derived(current ? current.params.project : undefined);
+	const projectId = $derived.by(() => {
+		if (current === undefined) {
+			return undefined;
+		}
+		return current.params.project;
+	});
+	const focus = $derived(current !== undefined && current.route.focus === true);
 
 	$effect(() => {
 		theme.apply();
@@ -35,9 +41,9 @@
 <svelte:window onkeydown={onKeydown} />
 
 <CommandPalette />
-<AppShell {projectId}>
+<AppShell {projectId} {focus}>
 	{#if current}
-		{#key kernel.router.path}
+		{#key current.route.id}
 			<current.route.component params={current.params} />
 		{/key}
 	{:else}

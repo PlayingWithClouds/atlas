@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Typechecks every server/contracts/plugin tsconfig, then svelte-checks the web app and each
+# Typechecks the contracts, server and plugin tsconfigs, then svelte-checks the web app and each
 # plugin web config. Exits non-zero if any step fails.
 set -u
+# Web-only plugins have no server tsconfig; an unmatched glob must expand to nothing.
+shopt -s nullglob
 root="$(cd "$(dirname "$0")/.." && pwd)"
 svelteCheck="$root/packages/web/node_modules/.bin/svelte-check"
 failures=0
