@@ -1,31 +1,26 @@
 import { Context } from "@neoworks/extension-system";
 import type { Fiber } from "@neoworks/extension-system";
 import DbCore from "./services/db";
-import DomainRoutes from "./services/domainRoutes";
 import HttpCore from "./services/http";
-import JobsCore from "./services/jobs";
-import ItemsCore from "./services/items";
-import LabelingCore from "./services/labeling";
 import LiveCore from "./services/live";
-import MediaKindsCore from "./services/mediaKinds";
-import ModelsCore from "./services/models";
 import NotificationsCore from "./services/notifications";
 import PluginsCore from "./services/plugins";
-import PrimitivesCore from "./services/primitives";
-import ProjectsCore from "./services/projects";
-import PythonRuntime from "./python/service";
-import SourcesCore from "./services/sources";
-import ToolsCore from "./services/tools";
-import WorkflowsCore from "./services/workflows";
 import WorkspaceCore from "./services/workspace";
+import LiveEvents from "./store/liveEvents";
+import StoreRoutes from "./store/routes";
+import StoreCore from "./store/store";
+import Webhooks from "./store/webhooks";
+import type { WebhookTiming } from "./store/webhooks";
 import { exportLogsToConsole } from "./consoleLogs";
 
 export interface HostOptions {
   workspaceDirectory: string;
   /** Port 0 picks a free port; omitted means the default. */
   port?: number;
-  /** Print `ctx.logger` output (plugin failures, Python worker stderr) to stderr. */
+  /** Print `ctx.logger` output (plugin failures, webhook errors) to stderr. */
   logToConsole?: boolean;
+  /** Overrides webhook retry timing; tests shorten it. */
+  webhookTiming?: Partial<WebhookTiming>;
 }
 
 export interface Host {
@@ -46,19 +41,11 @@ async function mountCoreServices(context: Context, options: HostOptions, mounted
     [DbCore, undefined],
     [HttpCore, { port: options.port }],
     [LiveCore, undefined],
-    [JobsCore, undefined],
     [NotificationsCore, undefined],
-    [ProjectsCore, undefined],
-    [MediaKindsCore, undefined],
-    [PrimitivesCore, undefined],
-    [ModelsCore, undefined],
-    [ItemsCore, undefined],
-    [SourcesCore, undefined],
-    [LabelingCore, undefined],
-    [DomainRoutes, undefined],
-    [WorkflowsCore, undefined],
-    [ToolsCore, undefined],
-    [PythonRuntime, undefined],
+    [StoreCore, undefined],
+    [StoreRoutes, undefined],
+    [LiveEvents, undefined],
+    [Webhooks, options.webhookTiming],
     [PluginsCore, undefined],
   ];
   for (const [service, config] of mounts) {

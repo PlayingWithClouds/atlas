@@ -1,6 +1,7 @@
 import type { Context } from '@neoworks/extension-system';
 import { createApiClient } from '../kernel/api';
 import { connectLive, LiveState, webSocketUrl } from '../kernel/live.svelte';
+import { ProjectList } from '../kernel/projects.svelte';
 import { Router } from '../kernel/router.svelte';
 import { ToastQueue } from '../kernel/toasts.svelte';
 
@@ -49,26 +50,29 @@ function installRouting(ctx: Context, router: Router): void {
   }, 'router:history');
 }
 
-/** api, toasts, live state + socket, and the router. */
+/** api, toasts, live state + socket, the project list, and the router. */
 export const servicesPlugin = {
   name: 'core-services',
-  inject: ['routes', 'liveHandlers'],
+  inject: ['routes'],
   apply(ctx: Context) {
     const toastQueue = new ToastQueue();
     const live = new LiveState();
+    const api = createApiClient();
+    const projects = new ProjectList(api);
     const router = new Router(ctx.routes, location.pathname);
 
-    ctx.provide('api', createApiClient());
+    ctx.provide('api', api);
     ctx.provide('toastQueue', toastQueue);
     ctx.provide('toasts', toastQueue);
     ctx.provide('live', live);
+    ctx.provide('projects', projects);
     ctx.provide('router', router);
 
     ctx.effect(() => () => toastQueue.dispose(), 'toasts:timers');
-    ctx.effect(
-      () => connectLive({ state: live, toasts: toastQueue, handlers: ctx.liveHandlers, url: webSocketUrl(location) }),
-      'live:socket',
-    );
+    ctx.effect(() => connectLive({ state: live, url: webSocketUrl(location) }), 'live:socket');
+    ctx.effect(() => live.subscribe((signal) => projects.onLive(signal)), 'projects:live');
+    ctx.effect(() => () => projects.dispose(), 'projects:timers');
+    void projects.refresh();
     installRouting(ctx, router);
   },
 };

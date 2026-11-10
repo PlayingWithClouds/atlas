@@ -2,7 +2,7 @@ import { FiberState, Service } from "@neoworks/extension-system";
 import type { Context, EffectMeta, Fiber } from "@neoworks/extension-system";
 import type { PluginEntry, PluginView } from "@atlas/contracts";
 import type { PluginsService } from "@atlas/contracts/server";
-import { loadPluginModule } from "./pluginResolver";
+import { loadPluginModule, PluginNotFoundError } from "./pluginResolver";
 
 interface LoadedPlugin {
   entry: PluginEntry;
@@ -146,13 +146,31 @@ export class PluginsCore extends Service implements PluginsService {
     const plugin: LoadedPlugin = { entry, configKey: configKeyOf(entry) };
     this.loaded.set(entry.package, plugin);
     try {
-      const module = await loadPluginModule(entry, this.ctx.workspace.directory);
-      plugin.fiber = this.ctx.plugin(module as never, entry.config as never);
-      await plugin.fiber.await();
+      await this.mount(plugin);
     } catch (error) {
-      this.ctx.logger.error(error);
-      this.recordLoadFailure(plugin, error);
+      this.reportLoadFailure(plugin, error);
     }
+  }
+
+  /** A web-only plugin has no server module and stays out of the list. */
+  private async mount(plugin: LoadedPlugin): Promise<void> {
+    const module = await loadPluginModule(plugin.entry, this.ctx.workspace.directory);
+    if (module === undefined) {
+      this.loaded.delete(plugin.entry.package);
+      return;
+    }
+    plugin.fiber = this.ctx.plugin(module as never, plugin.entry.config as never);
+    await plugin.fiber.await();
+  }
+
+  private reportLoadFailure(plugin: LoadedPlugin, error: unknown): void {
+    if (error instanceof PluginNotFoundError) {
+      this.ctx.logger.warn(`skipping plugin ${plugin.entry.package}: ${error.message}`);
+      this.loaded.delete(plugin.entry.package);
+      return;
+    }
+    this.ctx.logger.error(error);
+    this.recordLoadFailure(plugin, error);
   }
 
   private recordLoadFailure(plugin: LoadedPlugin, error: unknown): void {

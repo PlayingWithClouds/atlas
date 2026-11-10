@@ -8,7 +8,6 @@ interface NotificationRow {
   id: string;
   key: string | null;
   message: string;
-  session_id: string | null;
   level: NotificationLevel;
   created: string;
   updated: string;
@@ -19,7 +18,6 @@ const NOTIFICATIONS_MIGRATION = `
     id TEXT PRIMARY KEY,
     key TEXT,
     message TEXT NOT NULL,
-    session_id TEXT,
     level TEXT NOT NULL,
     created TEXT NOT NULL,
     updated TEXT NOT NULL
@@ -32,7 +30,6 @@ function rowToView(row: NotificationRow): NotificationView {
     id: row.id,
     key: row.key === null ? undefined : row.key,
     message: row.message,
-    sessionId: row.session_id === null ? undefined : row.session_id,
     level: row.level,
     created: row.created,
   };
@@ -77,7 +74,6 @@ export class NotificationsCore extends Service implements NotificationsService {
       toast: {
         id: this.nextId(),
         message: input.message,
-        sessionId: input.sessionId,
         level: levelOf(input),
       },
     });
@@ -121,14 +117,13 @@ export class NotificationsCore extends Service implements NotificationsService {
   private replace(existing: NotificationRow, input: NotificationInput): NotificationView {
     const updated = new Date().toISOString();
     this.ctx.db.database
-      .query("UPDATE notifications SET message = ?, level = ?, session_id = ?, updated = ? WHERE id = ?")
-      .run(input.message, levelOf(input), optionalText(input.sessionId), updated, existing.id);
+      .query("UPDATE notifications SET message = ?, level = ?, updated = ? WHERE id = ?")
+      .run(input.message, levelOf(input), updated, existing.id);
     this.ctx.live.notify();
     return rowToView({
       ...existing,
       message: input.message,
       level: levelOf(input),
-      session_id: optionalText(input.sessionId),
       updated,
     });
   }
@@ -139,14 +134,13 @@ export class NotificationsCore extends Service implements NotificationsService {
       id: this.nextId(),
       key: optionalText(input.key),
       message: input.message,
-      session_id: optionalText(input.sessionId),
       level: levelOf(input),
       created: now,
       updated: now,
     };
     this.ctx.db.database
-      .query("INSERT INTO notifications (id, key, message, session_id, level, created, updated) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .run(row.id, row.key, row.message, row.session_id, row.level, row.created, row.updated);
+      .query("INSERT INTO notifications (id, key, message, level, created, updated) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(row.id, row.key, row.message, row.level, row.created, row.updated);
     this.ctx.live.notify();
     return rowToView(row);
   }

@@ -1,12 +1,10 @@
 <script lang="ts">
-	import { classNamesOf } from '@atlas/contracts';
-	import type { Project, ProjectConfig } from '@atlas/contracts';
-	import type { ProjectTemplateContribution } from '@atlas/contracts/web';
-	import { onMount } from 'svelte';
+	import type { Project, ProjectInput } from '@atlas/contracts';
 	import { kernelContext } from '../../kernel/context';
-	import { messageOf } from '../shared/errors';
-	import { listFrom } from '../shared/lists';
 	import EmptyState from '../../lib/components/EmptyState.svelte';
+	import { problemsOf } from '../shared/errors';
+	import ProgressBar from '../shared/ProgressBar.svelte';
+	import { slugify } from '../taxonomy/taxonomyEdit';
 	import PlusIcon from 'phosphor-svelte/lib/Plus';
 
 	// Route components receive `params`; the list page has none.
@@ -16,149 +14,98 @@
 
 	let creating = $state(false);
 	let name = $state('');
-	let mediaKind = $state('');
-	let model = $state('');
-	let primitives = $state('');
+	let projectId = $state('');
+	let idEdited = $state(false);
 	let busy = $state(false);
-	let error = $state('');
-	let activeTemplateId = $state('');
+	let problems = $state<string[]>([]);
 
-	// Suggestions only: the server may not expose these listings yet, so failures are silent.
-	let knownMediaKinds = $state<string[]>([]);
-	let knownModels = $state<string[]>([]);
-	let knownPrimitives = $state<string[]>([]);
+	const canCreate = $derived(name.trim() !== '' && projectId !== '' && !busy);
 
-	const templates = $derived(ctx.projectTemplates.list());
-	const canCreate = $derived(name.trim() !== '' && mediaKind.trim() !== '' && model.trim() !== '' && !busy);
-
-	onMount(async () => {
-		knownMediaKinds = await idsFrom('/media-kinds', 'mediaKinds');
-		knownModels = await idsFrom('/models', 'models');
-		knownPrimitives = await idsFrom('/primitives', 'primitives');
-	});
-
-	async function idsFrom(path: string, key: string): Promise<string[]> {
-		try {
-			const entries = listFrom<{ id: string }>(await ctx.api.get(path), key);
-			return entries.map((entry) => entry.id);
-		} catch {
-			return [];
+	function onNameInput() {
+		if (!idEdited) {
+			projectId = slugify(name);
 		}
 	}
 
-	function applyTemplate(template: ProjectTemplateContribution) {
-		activeTemplateId = template.id;
-		const config = template.config;
-		if (config.mediaKind) mediaKind = config.mediaKind;
-		if (config.model) model = config.model;
-		if (config.primitives) primitives = config.primitives.join(', ');
-	}
-
-	function parsePrimitives(): string[] {
-		return primitives
-			.split(',')
-			.map((entry) => entry.trim())
-			.filter((entry) => entry !== '');
-	}
-
-	function buildConfig(): ProjectConfig {
-		const template = ctx.projectTemplates.get(activeTemplateId);
-		const base: Partial<ProjectConfig> = template ? template.config : {};
-		return {
-			labels: { groups: [] },
-			...base,
-			primitives: parsePrimitives(),
-			mediaKind: mediaKind.trim(),
-			model: model.trim()
-		};
+	function onIdInput() {
+		idEdited = true;
 	}
 
 	async function create() {
 		if (!canCreate) return;
 		busy = true;
-		error = '';
+		problems = [];
+		const input: ProjectInput = { id: projectId, name: name.trim() };
 		try {
-			const project = await ctx.api.post<Project>('/projects', { name: name.trim(), config: buildConfig() });
-			ctx.router.navigate(`/projects/${project.id}/overview`);
+			const project = await ctx.api.post<Project>('/projects', input);
+			await ctx.projects.refresh();
+			ctx.router.navigate(`/projects/${encodeURIComponent(project.id)}/taxonomy`);
 		} catch (failure) {
-			error = messageOf(failure);
+			problems = problemsOf(failure);
 		} finally {
 			busy = false;
 		}
 	}
 
 	function openProject(id: string) {
-		ctx.router.navigate(`/projects/${id}/overview`);
+		ctx.router.navigate(`/projects/${encodeURIComponent(id)}/queue`);
 	}
 </script>
 
 <div class="mx-auto max-w-2xl p-8">
 	<h1 class="text-default mb-1 text-2xl font-semibold tracking-tight">Projects</h1>
-	<p class="text-dim mb-6 text-sm">A project bundles a label schema, its data, and its own model pool.</p>
+	<p class="text-dim mb-6 text-sm">A project holds a taxonomy, the items to label and the labels people gave them.</p>
 
-	{#if ctx.live.projects.length}
+	{#if ctx.projects.error}<div class="alert alert-error mb-3">{ctx.projects.error}</div>{/if}
+
+	{#if ctx.projects.summaries.length}
 		<div class="border-line divide-line mb-4 divide-y overflow-hidden rounded-lg border">
-			{#each ctx.live.projects as project (project.id)}
+			{#each ctx.projects.summaries as project (project.id)}
 				<button type="button" onclick={() => openProject(project.id)} class="hover:bg-hover flex w-full items-center gap-3 px-4 py-3 text-left">
 					<div class="bg-primary/15 text-primary flex h-8 w-8 items-center justify-center rounded font-bold">{project.name.slice(0, 1).toUpperCase()}</div>
-					<div class="flex-1">
+					<div class="min-w-0 flex-1">
 						<div class="text-default text-sm font-medium">{project.name}</div>
-						<div class="text-faint text-xs">
-							{classNamesOf(project.config).length} labels · {project.config.mediaKind} · {project.config.primitives.join(', ')}
+						<div class="text-faint font-mono text-xs">{project.id}</div>
+					</div>
+					<div class="w-40 shrink-0">
+						<ProgressBar labeled={project.labeled} skipped={project.skipped} total={project.items} />
+						<div class="text-faint mt-1 text-right text-[11px]">
+							{project.labeled + project.skipped} / {project.items} done
 						</div>
 					</div>
 				</button>
 			{/each}
 		</div>
-	{:else if ctx.live.loaded}
-		<div class="mb-4"><EmptyState title="No projects yet" hint="Create the first project below." /></div>
+	{:else if ctx.projects.loaded}
+		<div class="mb-4"><EmptyState title="No projects yet" hint="Create the first project below, then point an adapter at it." /></div>
 	{/if}
 
-	{#if error}<div class="alert alert-error mb-3 text-sm">{error}</div>{/if}
-
 	{#if creating}
-		<div class="border-line bg-surface flex flex-col gap-3 rounded-lg border p-4">
-			<input class="input" placeholder="Project name" bind:value={name} />
-
-			{#if templates.length}
-				<fieldset class="flex flex-col gap-2">
-					<legend class="text-dim mb-1 text-xs font-semibold tracking-wider uppercase">Template</legend>
-					{#each templates as template (template.id)}
-						<label class="flex cursor-pointer items-start gap-2 text-sm">
-							<input type="radio" class="mt-0.5" checked={activeTemplateId === template.id} onchange={() => applyTemplate(template)} />
-							<span>
-								<span class="text-default">{template.label}</span>
-								<span class="text-faint block text-xs">{template.description}</span>
-							</span>
-						</label>
-					{/each}
-				</fieldset>
-			{:else}
-				<p class="text-dim text-xs">No project templates are registered; enter the ids by hand.</p>
+		<form
+			class="border-line bg-surface flex flex-col gap-3 rounded-lg border p-4"
+			onsubmit={(event) => {
+				event.preventDefault();
+				void create();
+			}}
+		>
+			{#if problems.length}
+				<div class="alert alert-error flex-col items-start">
+					{#each problems as problem (problem)}<span>{problem}</span>{/each}
+				</div>
 			{/if}
-
-			<label class="flex flex-col gap-1 text-sm">
-				<span class="text-dim text-xs font-semibold tracking-wider uppercase">Media kind</span>
-				<input class="input" list="known-media-kinds" placeholder="Media kind id" bind:value={mediaKind} />
+			<label class="form-control">
+				<span class="label-text">Name</span>
+				<input class="input" placeholder="Scene classification" bind:value={name} oninput={onNameInput} />
 			</label>
-			<label class="flex flex-col gap-1 text-sm">
-				<span class="text-dim text-xs font-semibold tracking-wider uppercase">Model</span>
-				<input class="input" list="known-models" placeholder="Model provider id" bind:value={model} />
+			<label class="form-control">
+				<span class="label-text">Id (used in adapter URLs, cannot change)</span>
+				<input class="input font-mono" placeholder="scenes" bind:value={projectId} oninput={onIdInput} />
 			</label>
-			<label class="flex flex-col gap-1 text-sm">
-				<span class="text-dim text-xs font-semibold tracking-wider uppercase">Annotation primitives</span>
-				<input class="input" list="known-primitives" placeholder="Comma-separated primitive ids" bind:value={primitives} />
-			</label>
-
-			<datalist id="known-media-kinds">{#each knownMediaKinds as id (id)}<option value={id}></option>{/each}</datalist>
-			<datalist id="known-models">{#each knownModels as id (id)}<option value={id}></option>{/each}</datalist>
-			<datalist id="known-primitives">{#each knownPrimitives as id (id)}<option value={id}></option>{/each}</datalist>
-
 			<div class="flex gap-2">
-				<button type="button" class="btn btn-sm btn-primary" disabled={!canCreate} onclick={create}>Create</button>
+				<button type="submit" class="btn btn-sm btn-primary" disabled={!canCreate}>Create</button>
 				<button type="button" class="btn btn-sm btn-ghost" onclick={() => (creating = false)}>Cancel</button>
 			</div>
-		</div>
+		</form>
 	{:else}
 		<button type="button" class="btn btn-sm btn-outline" onclick={() => (creating = true)}><PlusIcon size={15} /> New project</button>
 	{/if}

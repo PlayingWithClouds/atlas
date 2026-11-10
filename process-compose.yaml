@@ -6,9 +6,10 @@
 # -U puts process-compose's own API on a unix socket: its default TCP port 8080
 # is where the veil backend listens.
 #
-# `server` is the Bun host (restarts on source changes; plugins in the workspace's
-# atlas.json also hot-reload on their own). `web` is the Vite dev server, which proxies
-# /api to the server. Open http://localhost:5173.
+# `server` is the Bun host: the labeling store and its HTTP API (restarts on source changes;
+# plugins in the workspace's atlas.json also hot-reload on their own). `web` is the Vite dev
+# server, which proxies /api to the server. Open http://localhost:5173. Adapters talk to the
+# server directly on :8123 (see docs/schema.md).
 #
 # ATLAS_WORKSPACE selects the workspace directory (default .atlas-workspace); create one with
 # `task init`. Every process inherits it.

@@ -1,0 +1,7 @@
+{
+  "title": "atlas (fake API)",
+  "plugins": [
+    { "package": "@atlas/plugin-media-image", "path": "../../../../plugins/media-image" },
+    { "package": "@atlas/plugin-media-video", "path": "../../../../plugins/media-video" }
+  ]
+}

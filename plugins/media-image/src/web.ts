@@ -1,24 +1,15 @@
 import type { Context } from "@neoworks/extension-system";
-import ImageCell from "./web/ImageCell.svelte";
+import ImagePlayer from "./web/ImagePlayer.svelte";
+import ImagePreview from "./web/ImagePreview.svelte";
 
+/** Shows image assets. */
 export default {
   name: "media-image-web",
-  inject: ["mediaCells", "projectTemplates"],
+  inject: ["mediaPlayers"],
   apply(ctx: Context) {
     ctx.effect(
-      () => ctx.mediaCells.register({ id: "image.cell", mediaKind: "image", component: ImageCell }),
-      "mediaCell:image",
-    );
-    // The model is deliberately omitted: the create form requires the user to pick one.
-    ctx.effect(
-      () =>
-        ctx.projectTemplates.register({
-          id: "image.tagging",
-          label: "Image tagging",
-          description: "Assign tags to images.",
-          config: { mediaKind: "image", primitives: ["tag"], labels: { groups: [] } },
-        }),
-      "projectTemplate:image-tagging",
+      () => ctx.mediaPlayers.register({ id: "image.player", kind: "image", player: ImagePlayer, preview: ImagePreview }),
+      "mediaPlayer:image",
     );
   },
 };

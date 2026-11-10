@@ -2,11 +2,14 @@ import type { ApiClient } from '@atlas/contracts/web';
 
 export class ApiError extends Error {
   readonly status: number;
+  /** Every problem of a `422 { errors }` answer; a single entry for other failures. */
+  readonly problems: string[];
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, problems: string[] = [message]) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.problems = problems;
   }
 }
 
@@ -21,13 +24,20 @@ export function resolveApiPath(path: string): string {
   return `${API_PREFIX}${absolute}`;
 }
 
-async function errorMessageOf(response: Response): Promise<string> {
-  const body = await response.json().catch(() => ({}));
-  const detail = (body as { detail?: unknown }).detail;
-  if (typeof detail === 'string' && detail !== '') {
-    return detail;
+function problemsOf(body: { errors?: unknown; detail?: unknown }, fallback: string): string[] {
+  if (Array.isArray(body.errors) && body.errors.length > 0) {
+    return body.errors.map((problem) => String(problem));
   }
-  return response.statusText;
+  if (typeof body.detail === 'string' && body.detail !== '') {
+    return [body.detail];
+  }
+  return [fallback];
+}
+
+async function failureOf(response: Response): Promise<ApiError> {
+  const body = await response.json().catch(() => ({}));
+  const problems = problemsOf(body as { errors?: unknown; detail?: unknown }, response.statusText);
+  return new ApiError(problems.join('; '), response.status, problems);
 }
 
 async function readBody<T>(response: Response): Promise<T> {
@@ -50,7 +60,7 @@ export function createApiClient(fetchImplementation: typeof fetch = fetch): ApiC
     }
     const response = await fetchImplementation(resolveApiPath(path), init);
     if (!response.ok) {
-      throw new ApiError(await errorMessageOf(response), response.status);
+      throw await failureOf(response);
     }
     return readBody<T>(response);
   }

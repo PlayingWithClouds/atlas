@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { HttpError } from "../../packages/contracts/src/server";
+import { HttpError, ValidationFailure } from "../../packages/contracts/src/server";
 import { matchSegments, splitPath } from "../../packages/server/src/services/router";
 import type { Host } from "../../packages/server/src/index";
 import { startHost, urlOf } from "./helpers";
@@ -53,6 +53,22 @@ describe("http service", () => {
     expect(preflight.status).toBe(204);
   });
 
+  test("a malformed percent-encoding in the path is a 400", async () => {
+    host = await startHost();
+    host.context.http.route("GET", "/t/echo/:name", (_request, params) => ({ name: params.name }));
+    expect((await fetch(urlOf(host, "/t/echo/%E0%A4%A"))).status).toBe(400);
+  });
+
+  test("ValidationFailure answers 422 with an errors list", async () => {
+    host = await startHost();
+    host.context.http.route("POST", "/t/invalid", () => {
+      throw new ValidationFailure(["first", "second"]);
+    });
+    const response = await fetch(urlOf(host, "/t/invalid"), { method: "POST" });
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({ errors: ["first", "second"] });
+  });
+
   test("route disposer removes the route", async () => {
     host = await startHost();
     const dispose = host.context.http.route("GET", "/t/temp", () => ({ ok: 1 }));
@@ -61,10 +77,10 @@ describe("http service", () => {
     expect((await fetch(urlOf(host, "/t/temp"))).status).toBe(404);
   });
 
-  test("websocket receives state snapshot and toast", async () => {
+  test.each(["/api/live", "/api/ws"])("websocket on %s receives state snapshot and toast", async (socketPath) => {
     host = await startHost();
     host.context.live.provideState("probe", () => 42);
-    const socket = new WebSocket(`ws://localhost:${host.context.http.port}/api/ws`);
+    const socket = new WebSocket(`ws://localhost:${host.context.http.port}${socketPath}`);
     const messages: any[] = [];
     socket.onmessage = (event) => messages.push(JSON.parse(String(event.data)));
     await new Promise((resolve) => (socket.onopen = resolve));

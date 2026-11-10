@@ -198,6 +198,7 @@ export interface ItemPage {
 
 /** `GET /api/projects/:project/items/:item`: everything the labeling screen needs. */
 export interface ItemDetail extends ItemView {
+  /** Every source's latest push for this item, oldest push first. */
   suggestions: Suggestion[];
   /** Items of the same asset just before and after this one, by span start. */
   previous?: ItemView;
