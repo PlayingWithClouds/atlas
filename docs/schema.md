@@ -162,19 +162,32 @@ interface Suggestion {
 
 ## HTTP API
 
-All bodies are JSON. Batch endpoints take up to 1000 records and answer
-`{ ok: number, errors: { id, message }[] }`. An error on one record does not stop the rest
-of the batch. When atlas is configured with tokens, adapters send `Authorization: Bearer <token>`.
+All bodies are JSON. Types are in `packages/contracts/src/schema.ts`, rules in
+`packages/contracts/src/validate.ts`.
+
+- **Batches.** Batch endpoints take up to 1000 records and answer
+  `{ ok: number, errors: { id, message }[] }`. An error on one record does not stop the rest
+  of the batch.
+- **Ids in paths.** Item ids go into paths URL-encoded (`encodeURIComponent`).
+- **Errors.** Invalid single writes answer `422 { errors: string[] }`.
+- **Auth.** Requests from this machine are trusted. Other machines must send
+  `Authorization: Bearer <token>` once `tokens` are configured in `atlas.json`.
 
 | Method | Path | Body / query | Answer |
 |---|---|---|---|
-| GET | `/api/projects` | | `Project[]` |
+| GET | `/api/projects` | | `ProjectSummary[]` |
+| POST | `/api/projects` | `ProjectInput` | `Project` |
 | GET | `/api/projects/:project` | | `Project` (with `taxonomy`) |
+| PATCH | `/api/projects/:project` | `{ name?, prefillSource? }` | `Project` |
 | PUT | `/api/projects/:project/taxonomy` | `Taxonomy` | `Taxonomy` (new version) |
 | POST | `/api/projects/:project/assets` | `Asset[]` | batch result |
 | POST | `/api/projects/:project/items` | `Item[]` | batch result |
 | POST | `/api/projects/:project/items/delete` | `{ ids: string[] }` | batch result |
 | GET | `/api/projects/:project/items` | `?status=pending\|labeled\|skipped&cursor=&limit=` | `{ items, cursor }` |
+| GET | `/api/projects/:project/items/:item` | | `ItemDetail` |
+| GET | `/api/projects/:project/queue/next` | `?after=<item id>` | `QueueNext` |
+| PUT | `/api/projects/:project/items/:item/annotation` | `AnnotationInput` | `Annotation` |
+| DELETE | `/api/projects/:project/items/:item/annotation` | | `204` |
 | POST | `/api/projects/:project/suggestions` | `Suggestion[]` | batch result |
 | GET | `/api/projects/:project/annotations` | `?since=<cursor>&limit=` | `{ changes: Change[], cursor }` |
 
@@ -196,10 +209,10 @@ interface Change {
 
 ## Webhooks
 
-Configured per project in `atlas.json`:
+Configured in `atlas.json`. Leaving out `project` sends events of every project:
 
 ```json
-{ "webhooks": [{ "url": "http://127.0.0.1:9000/atlas", "events": ["annotation", "taxonomy"] }] }
+{ "webhooks": [{ "url": "http://127.0.0.1:9000/atlas", "project": "scenes", "events": ["annotation", "taxonomy"] }] }
 ```
 
 Atlas posts one event per change, in order. It retries with backoff and gives up after a
@@ -210,6 +223,12 @@ type Event =
   | { type: "annotation"; projectId: string; change: Change }
   | { type: "taxonomy"; projectId: string; taxonomy: Taxonomy };
 ```
+
+## Live updates
+
+The web app receives `LiveEvent`s over the WebSocket at `/api/live`. They tell it that items,
+suggestions, an annotation, a taxonomy or the project list changed, so the screens refresh
+without reloading.
 
 ## Typical adapters
 
