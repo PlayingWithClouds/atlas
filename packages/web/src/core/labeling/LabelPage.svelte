@@ -10,6 +10,8 @@
 	import MetaDetails from './MetaDetails.svelte';
 	import { effectiveSpan } from './ranges';
 	import Timeline from './Timeline.svelte';
+	import SuggestionPicker from './SuggestionPicker.svelte';
+	import { settings } from '../settings/settings.svelte';
 	import { formatClock, formatSpan } from '../shared/time';
 
 	let { params }: { params: Record<string, string> } = $props();
@@ -62,7 +64,7 @@
 	}
 
 	function onKeydown(event: KeyboardEvent) {
-		if (cheatSheetOpen || isTypingTarget(event.target)) {
+		if (cheatSheetOpen || session.suggestionPicker !== undefined || isTypingTarget(event.target)) {
 			return;
 		}
 		const action = session.handleKey(event);
@@ -139,6 +141,7 @@
 							asset={detail.asset}
 							{media}
 							{itemSpan}
+							zoomRequest={session.zoomRequest}
 							trimmed={session.draft.span}
 							playhead={session.playhead}
 							frameRate={session.frameRate()}
@@ -190,6 +193,9 @@
 							{#each problemLines as problem (problem)}<span>{problem}</span>{/each}
 						</div>
 					{/if}
+					{#if session.leaderPending}
+						<div class="text-violet px-1 text-sm">Leader <kbd class="font-mono">{settings.value.leader}</kbd> … waiting for the next key</div>
+					{/if}
 					{#if session.notice}
 						<div class="text-amber px-1 text-sm">{session.notice}</div>
 					{/if}
@@ -209,3 +215,6 @@
 {/if}
 
 <CheatSheet open={cheatSheetOpen} onclose={() => (cheatSheetOpen = false)} />
+{#if session.suggestionPicker}
+	<SuggestionPicker {session} picker={session.suggestionPicker} />
+{/if}

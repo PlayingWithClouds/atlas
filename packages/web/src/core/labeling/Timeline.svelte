@@ -14,6 +14,8 @@
 	import type { LabelTrack, RangeDragMode, SuggestedRange, TimelineWindow } from './timeline';
 	import { draggedRange, pageTo, panWindow, percentAt, secondsAtFraction, snapTime, tickStep, ticksOf, timelineWindow, zoomWindow } from './timeline';
 	import { formatClock } from '../shared/time';
+	import { settings } from '../settings/settings.svelte';
+	import { untrack } from 'svelte';
 
 	let {
 		asset,
@@ -39,7 +41,8 @@
 		onrefine,
 		ondelete,
 		onhover,
-		onscrub
+		onscrub,
+		zoomRequest
 	}: {
 		asset: Asset;
 		media: MediaPlayerContribution | undefined;
@@ -72,6 +75,8 @@
 		onhover: (seconds: number | undefined) => void;
 		/** Scrubbing the ruler started: the player pauses so it stays where the pointer leaves it. */
 		onscrub: () => void;
+		/** Zoom by `factor` around the playhead each time `id` changes (keyboard + / -). */
+		zoomRequest: { id: number; factor: number } | undefined;
 	} = $props();
 
 	const FILMSTRIP_CELL_PIXELS = 128;
@@ -222,6 +227,17 @@
 		}
 		return event.deltaX;
 	}
+
+	let lastZoomId = 0;
+
+	$effect(() => {
+		const request = zoomRequest;
+		if (request === undefined || request.id === lastZoomId) {
+			return;
+		}
+		lastZoomId = request.id;
+		untrack(() => zoomBy(request.factor));
+	});
 
 	function zoomBy(factor: number): void {
 		wheelTarget = undefined;
@@ -683,11 +699,11 @@
 				</button>
 			</div>
 		{:else}
-			<span class="min-w-0 flex-1 truncate"><span class="font-mono">/</span> start a label at the playhead · <span class="font-mono">]</span> end it · <span class="font-mono">S</span> take the suggestion from here · drag in a track or a bar's edges · <span class="font-mono">?</span> all keys</span>
+			<span class="min-w-0 flex-1 truncate"><span class="font-mono">/</span> start a label at the playhead · <span class="font-mono">]</span> end it · <span class="font-mono">S</span> pick suggestions from here · drag in a track or a bar's edges · <span class="font-mono">?</span> all keys</span>
 		{/if}
 		<div class="flex shrink-0 gap-0.5">
-			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" onmousedown={(event) => event.preventDefault()} onclick={() => zoomBy(1.6)} title="Zoom out (wheel)"><MagnifyingGlassMinusIcon size={14} /></button>
-			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" onmousedown={(event) => event.preventDefault()} onclick={() => zoomBy(1 / 1.6)} title="Zoom in around the playhead (wheel)"><MagnifyingGlassPlusIcon size={14} /></button>
+			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" onmousedown={(event) => event.preventDefault()} onclick={() => zoomBy(settings.value.zoomStep)} title="Zoom out (wheel, -)"><MagnifyingGlassMinusIcon size={14} /></button>
+			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" onmousedown={(event) => event.preventDefault()} onclick={() => zoomBy(1 / settings.value.zoomStep)} title="Zoom in around the playhead (wheel, +)"><MagnifyingGlassPlusIcon size={14} /></button>
 			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" disabled={!zoomed} onmousedown={(event) => event.preventDefault()} onclick={fit} title="Fit the item"><ArrowsOutLineHorizontalIcon size={14} /></button>
 		</div>
 	</div>

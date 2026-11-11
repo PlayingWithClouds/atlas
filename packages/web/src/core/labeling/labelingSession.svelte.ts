@@ -22,24 +22,20 @@ import {
   valuesOfGroup,
 } from './draft';
 import type { Draft } from './draft';
-import { actionForKey } from './keyboardMap';
+import { actionForKey, isRepeatable } from './keyboardMap';
 import type { KeyPress, LabelAction } from './keyboardMap';
-import { MIN_RANGE_SECONDS, addRange, closePending, deleteRange, effectiveSpan, findPending, isSameSpan, itemTimeOf, refineRange, replaceRange, restartPending, stepRange, togglePending, trimEdge } from './ranges';
+import { MIN_RANGE_SECONDS, addRange, closePending, deleteRange, effectiveSpan, findPending, isSameSpan, itemTimeOf, refineRange, replaceRange, restartPending, togglePending, trimEdge } from './ranges';
 import type { PendingRange, RangeTarget } from './ranges';
 import { acceptProposals, chooseSuggestion } from './suggestions';
 import { labelTracks, rangeBetween, rangesFromHere } from './timeline';
 import type { SuggestedRange } from './timeline';
+import { settings } from '../settings/settings.svelte';
 
 const NOTICE_LIFETIME_MS = 4000;
 
-/** Holding a key must not save, skip or toggle over and over; moving and seeking may repeat. */
-function isRepeatable(action: LabelAction): boolean {
-  return action.kind === 'seek' || action.kind === 'stepFrames' || action.kind === 'focusGroup';
-}
-
 /** Everything the labeling screen knows and can do for one item at a time. */
-/** S asks the adapter live; past this it falls back to the pushed suggestions. */
-const LIVE_TIMEOUT_MS = 3000;
+/** How long the leader waits for the key that completes its sequence. */
+const LEADER_WINDOW_MS = 1500;
 
 function tookMessage(count: number): string {
   if (count === 0) {
@@ -58,6 +54,13 @@ export class LabelingSession {
   focusedGroupId = $state<string | undefined>(undefined);
   /** The label search box at the top of the panel (/). */
   searchOpen = $state(false);
+  /** S: the model's ranges at one moment, offered to pick from; undefined while closed. */
+  suggestionPicker = $state.raw<{ time: number; ranges: SuggestedRange[] } | undefined>(undefined);
+  /** Each request bumps `id`; the timeline zooms by `factor` around the playhead. */
+  zoomRequest = $state.raw<{ id: number; factor: number } | undefined>(undefined);
+  /** The leader key was pressed and waits for the rest of its sequence. */
+  leaderPending = $state(false);
+  private leaderTimer: ReturnType<typeof setTimeout> | undefined;
   /** Ranges started at the playhead and waiting for ] (or R) to end them; several at once. */
   openRanges = $state.raw<PendingRange[]>([]);
   /** The range clicked on the timeline; [ and ] move its edges, Backspace deletes it. */
@@ -234,6 +237,11 @@ export class LabelingSession {
     this.detail = detail;
     this.draft = draftFromAnnotation(project.taxonomy, detail.annotation);
     this.loadedFingerprint = fingerprintOf(project.taxonomy, this.draft);
+    // Opened after the fingerprint: expanding alone is no edit worth an "unsaved" badge.
+    if (settings.value.expandMoreGroups && !this.draft.moreExpanded) {
+      this.draft = setMoreExpanded(this.draft, true);
+      this.loadedFingerprint = fingerprintOf(project.taxonomy, this.draft);
+    }
     this.openRanges = [];
     this.selectedRange = undefined;
     this.loopedRange = undefined;
@@ -312,6 +320,31 @@ export class LabelingSession {
 
   stepFrames(count: number): void {
     this.handle?.stepFrames(count);
+  }
+
+  /** 0 / $: the playhead to the first or last frame of the scene (or its trim). */
+  seekToSceneEdge(edge: 'start' | 'end'): void {
+    const span = this.playSpan;
+    if (span === undefined) {
+      return;
+    }
+    if (edge === 'start') {
+      this.seekTo(span.start);
+      return;
+    }
+    this.seekTo(Math.max(span.start, span.end - 1 / this.frameRate()));
+  }
+
+  zoomTimeline(direction: 1 | -1): void {
+    let factor = settings.value.zoomStep;
+    if (direction === 1) {
+      factor = 1 / factor;
+    }
+    let id = 1;
+    if (this.zoomRequest !== undefined) {
+      id = this.zoomRequest.id + 1;
+    }
+    this.zoomRequest = { id, factor };
   }
 
   frameRate(): number {
@@ -483,34 +516,6 @@ export class LabelingSession {
     return valuesOfGroup(this.draft, group.id)[0];
   }
 
-  rangeKey(): void {
-    const group = this.focusedGroup;
-    if (group === undefined || this.asset === undefined || this.asset.kind !== 'video') {
-      this.say('Ranges need a video and a focused group');
-      return;
-    }
-    const labelId = this.focusedLabelId(group);
-    if (labelId === undefined) {
-      this.say(`Pick a label in "${group.label}" first, then press R for its range`);
-      return;
-    }
-    const target = { group: group.id, label: labelId };
-    const time = itemTimeOf(this.currentTime(), this.itemStart, this.length);
-    const step = stepRange(findPending(this.openRanges, target), target, time);
-    if (step.problem !== undefined) {
-      this.say(step.problem);
-    }
-    const others = this.openRanges.filter((pending) => pending.group !== target.group || pending.label !== target.label);
-    if (step.pending !== undefined) {
-      this.openRanges = [...others, step.pending];
-    }
-    if (step.range !== undefined) {
-      const range = step.range;
-      this.openRanges = others;
-      this.edit((taxonomy, draft) => addRange(taxonomy, draft, range));
-    }
-  }
-
   /** Starts a range for the label at the playhead, or drops it when it is already open. */
   toggleOpenRange(group: Group, labelId: string): void {
     const target = { group: group.id, label: labelId };
@@ -552,23 +557,41 @@ export class LabelingSession {
     if (suggested === undefined) {
       suggested = this.storedSuggestedRanges();
     }
-    if (suggested.length === 0) {
-      this.say('No suggested sections for this item');
+    const offered = rangesFromHere(suggested, this.draft.ranges, time, MIN_RANGE_SECONDS).filter((range) => this.isOffered(range));
+    if (offered.length === 0) {
+      this.say('No suggested section at the playhead');
       return;
     }
-    const taken = rangesFromHere(suggested, this.draft.ranges, time, MIN_RANGE_SECONDS);
+    const scores = new Map(suggested.map((ghost) => [`${ghost.group}.${ghost.label}`, ghost.score]));
+    this.suggestionPicker = {
+      time,
+      ranges: offered.map((range) => ({ ...range, score: scores.get(`${range.group}.${range.label}`) || 0 })),
+    };
+  }
+
+  /** Labels drawn on the timeline: a refinement only once its parent is on. */
+  private isOffered(range: Range): boolean {
+    const group = this.taxonomy?.groups.find((candidate) => candidate.id === range.group);
+    return group !== undefined && isGroupActive(group, this.draft.values, this.draft.ranges);
+  }
+
+  /** The picked suggestions become ranges; refinements whose parent is not on are left out. */
+  takeSuggestions(picked: SuggestedRange[]): void {
     let added = 0;
-    for (const range of taken) {
-      // Only labels drawn on the timeline: a refinement counts once its parent is on, which
-      // the parent's own range (taken earlier in this loop) may just have done.
-      const group = this.taxonomy?.groups.find((candidate) => candidate.id === range.group);
-      if (group === undefined || !isGroupActive(group, this.draft.values, this.draft.ranges)) {
+    for (const suggestion of picked) {
+      const range = { group: suggestion.group, label: suggestion.label, start: suggestion.start, end: suggestion.end };
+      if (!this.isOffered(range)) {
         continue;
       }
       this.edit((taxonomy, draft) => addRange(taxonomy, draft, range));
       added += 1;
     }
+    this.suggestionPicker = undefined;
     this.say(tookMessage(added));
+  }
+
+  closeSuggestionPicker(): void {
+    this.suggestionPicker = undefined;
   }
 
   private storedSuggestedRanges(): SuggestedRange[] {
@@ -586,7 +609,7 @@ export class LabelingSession {
     }
     const query = new URLSearchParams({ item: this.item.id, at: time.toFixed(3) });
     try {
-      const response = await fetch(`${url}?${query}`, { signal: AbortSignal.timeout(LIVE_TIMEOUT_MS) });
+      const response = await fetch(`${url}?${query}`, { signal: AbortSignal.timeout(settings.value.liveTimeoutMs) });
       if (!response.ok) {
         return undefined;
       }
@@ -601,10 +624,10 @@ export class LabelingSession {
     }
   }
 
-  /** Shift+F: the open labels hold for the whole item instead of a range. */
+  /** Leader then F: the open labels hold for the whole item instead of a range. */
   wholeItem(): void {
     if (this.openRanges.length === 0) {
-      this.say('Start a label with / first, then Shift+F makes it hold for the whole scene');
+      this.say('Start a label with / first, then leader F makes it hold for the whole scene');
       return;
     }
     const taxonomy = this.taxonomy;
@@ -768,7 +791,9 @@ export class LabelingSession {
 
   handleKey(press: KeyPress): LabelAction | undefined {
     const labels = this.keyedLabelsOfFocusedGroup();
-    const action = actionForKey(press, labels);
+    const afterLeader = this.leaderPending;
+    this.endLeader();
+    const action = actionForKey({ ...press, afterLeader }, labels, settings.keymap);
     if (action === undefined) {
       return undefined;
     }
@@ -796,13 +821,12 @@ export class LabelingSession {
       copyPrevious: () => this.copyPrevious(),
       trimStart: () => this.setEdge('start'),
       trimEnd: () => this.setEdge('end'),
-      range: () => this.rangeKey(),
-      toggleMore: () => this.toggleMore(),
       toggleMuted: () => this.toggleMuted(),
       toggleReviewed: () => this.toggleFocusedReviewed(),
       escape: () => this.cancelRange(),
       search: () => (this.searchOpen = true),
       wholeItem: () => this.wholeItem(),
+      leader: () => this.startLeader(),
       acceptHere: () => void this.acceptSuggestionsHere(),
     };
     simple[action.kind]?.();
@@ -817,14 +841,40 @@ export class LabelingSession {
       this.toggleFocusedLabel(action.labelId);
     }
     if (action.kind === 'seek') {
-      this.seekBy(action.seconds);
+      this.seekBy(action.direction * settings.value.seekSeconds);
     }
     if (action.kind === 'stepFrames') {
-      this.stepFrames(action.count);
+      this.stepFrames(action.direction * this.framesPerStep(action.jump));
+    }
+    if (action.kind === 'seekToEdge') {
+      this.seekToSceneEdge(action.edge);
+    }
+    if (action.kind === 'zoom') {
+      this.zoomTimeline(action.direction);
     }
     if (action.kind === 'neighbour') {
       this.openNeighbour(action.offset);
     }
+  }
+
+  private framesPerStep(jump: boolean): number {
+    if (jump) {
+      return settings.value.frameJump;
+    }
+    return 1;
+  }
+
+  // --- leader --------------------------------------------------------------------------
+
+  private startLeader(): void {
+    this.leaderPending = true;
+    clearTimeout(this.leaderTimer);
+    this.leaderTimer = setTimeout(() => this.endLeader(), LEADER_WINDOW_MS);
+  }
+
+  private endLeader(): void {
+    this.leaderPending = false;
+    clearTimeout(this.leaderTimer);
   }
 
   // --- notices -------------------------------------------------------------------------
@@ -837,6 +887,7 @@ export class LabelingSession {
 
   dispose(): void {
     clearTimeout(this.noticeTimer);
+    clearTimeout(this.leaderTimer);
     this.loadCounter += 1;
   }
 }

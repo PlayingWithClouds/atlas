@@ -1,7 +1,9 @@
 <script lang="ts">
-	// Hotkey-driven command menu (F1 / Shift+K). Commands come from the registry; hotkeys
+	// Hotkey-driven command menu (F1 / Ctrl+P, set in Settings). Commands come from the registry; hotkeys
 	// default to the contribution's `hotkey` and can be reassigned per browser.
 	import type { CommandContribution } from '@atlas/contracts/web';
+	import { chordsOfPress, normalizeChord } from '../../core/labeling/keyboardMap';
+	import { settings } from '../../core/settings/settings.svelte';
 	import { kernelContext } from '../../kernel/context';
 
 	const ctx = kernelContext();
@@ -83,9 +85,11 @@
 		rebindingId = null;
 	}
 
+	/** F1, or the key set in Settings (Ctrl+P unless changed). */
 	function isSummonChord(event: KeyboardEvent): boolean {
 		if (event.key === 'F1') return true;
-		return event.shiftKey && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === 'k';
+		const wanted = normalizeChord(settings.value.commandMenu);
+		return chordsOfPress(event).includes(wanted);
 	}
 
 	function onWindowKey(event: KeyboardEvent) {
@@ -100,12 +104,13 @@
 			}
 			return;
 		}
-		if (isTyping(event.target)) return;
+		// Before the typing check: Ctrl+P in a text field would otherwise open the print dialog.
 		if (isSummonChord(event)) {
 			event.preventDefault();
 			openMenu();
 			return;
 		}
+		if (isTyping(event.target)) return;
 		const pressed = combo(event);
 		const match = available.find((command) => hotkeyOf(command) === pressed);
 		if (match) {
@@ -190,7 +195,7 @@
 			</div>
 			<div class="border-line text-faint border-t px-3 py-1.5 text-[11px]">
 				Summon with <span class="bg-base-100 rounded px-1 font-mono">F1</span> or
-				<span class="bg-base-100 rounded px-1 font-mono">⇧K</span> · click a hotkey to reassign
+				<span class="bg-base-100 rounded px-1 font-mono">{settings.value.commandMenu}</span> · click a hotkey to reassign
 			</div>
 		</div>
 	</div>

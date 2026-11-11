@@ -41,7 +41,7 @@
 		if (proposed && strong) {
 			return 'border-green/70 text-default hover:bg-green-soft';
 		}
-		return 'border-line-faint text-muted hover:text-default hover:border-line hover:bg-hover';
+		return 'border-line-strong bg-raised text-default hover:bg-hover';
 	});
 
 	const tooltip = $derived.by(() => {
@@ -73,7 +73,7 @@
 	{#if label.deprecated}<span class="text-[11px] uppercase opacity-60">old</span>{/if}
 	{#if hasRange}<ClockIcon size={12} class={selected ? '' : 'text-violet'} />{/if}
 	{#if proposed}
-		<span class="font-mono text-[11px] tabular-nums {strong ? 'text-green' : 'text-faint'}">{percent}</span>
+		<span class="font-mono text-[11px] tabular-nums {strong ? 'text-green' : 'text-dim'}">{percent}</span>
 	{/if}
-	{#if badge}<span class="shrink-0 font-mono text-[11px] opacity-40">{badge}</span>{/if}
+	{#if badge}<span class="text-dim shrink-0 font-mono text-[11px]">{badge}</span>{/if}
 </button>

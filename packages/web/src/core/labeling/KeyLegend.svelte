@@ -1,8 +1,9 @@
 <script lang="ts">
 	import type { KeyHelp } from './keyboardMap';
-	import { KEY_HELP } from './keyboardMap';
+	import { keyHelp } from './keyboardMap';
+	import { settings } from '../settings/settings.svelte';
 
-	const compactHelp = KEY_HELP.filter((entry) => entry.compact);
+	const compactHelp = $derived(keyHelp(settings.keymap).filter((entry) => entry.compact));
 
 	function wordOf(entry: KeyHelp): string {
 		if (entry.short !== undefined) {

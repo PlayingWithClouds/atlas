@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Key from '../../lib/components/Key.svelte';
-	import { KEY_HELP } from './keyboardMap';
+	import { keyHelp } from './keyboardMap';
+	import { settings } from '../settings/settings.svelte';
 
 	let { open, onclose }: { open: boolean; onclose: () => void } = $props();
 
@@ -22,7 +23,7 @@
 		<h2 class="text-default mb-3 text-lg font-semibold">Keyboard</h2>
 		<table class="w-full text-[15px]">
 			<tbody>
-				{#each KEY_HELP as entry (entry.action)}
+				{#each keyHelp(settings.keymap) as entry (entry.action)}
 					<tr class="border-line border-b last:border-b-0">
 						<td class="w-40 py-1.5 pr-3 whitespace-nowrap">
 							{#each entry.keys as key (key)}<Key label={key} />{/each}
