@@ -398,7 +398,7 @@
 
 	function trackTitle(track: LabelTrack): string {
 		if (track.whole) {
-			return `${track.group.label}: ${track.label.name}, whole item. Drag in the track to limit it to a range.`;
+			return `${track.group.label}: ${track.label.name}, for the entire scene. Drag inside the track to mark only the parts where it happens.`;
 		}
 		return `${track.group.label}: ${track.label.name}. Drag in the track to add a range.`;
 	}
@@ -488,7 +488,11 @@
 				title={trackTitle(track)}
 			>
 				{#if track.whole}
-					<div class="bg-violet/20 border-violet/40 pointer-events-none absolute inset-y-0.5 flex items-center rounded-sm border border-dashed px-1 text-[10px] whitespace-nowrap text-white/70" style="left: {left(wholeSpan().start)}%; width: {widthBetween(wholeSpan().start, wholeSpan().end)}%">whole item{#if track.wholeNote}<span class="text-default font-medium">&nbsp;· {track.wholeNote}</span>{/if}</div>
+					<div class="bg-violet/25 border-violet/50 pointer-events-none absolute inset-y-0.5 flex items-center rounded-sm border border-dashed gap-1 overflow-hidden px-1.5 text-[11px] whitespace-nowrap text-white" style="left: {left(wholeSpan().start)}%; width: {widthBetween(wholeSpan().start, wholeSpan().end)}%">
+						<span class="font-medium">{track.label.name}</span>
+						{#if track.wholeNote}<span class="text-white/80">· {track.wholeNote}</span>{/if}
+						{#if track.armed}<span class="ml-auto pl-2 text-white/40">entire scene · drag inside to mark only parts</span>{/if}
+					</div>
 				{/if}
 
 				{#each track.ghosts as ghost (ghost)}
@@ -518,9 +522,10 @@
 						class="absolute inset-y-0 cursor-grab overflow-hidden rounded-sm {barClass(range)}"
 						style="left: {left(itemStart + shown.start)}%; width: {widthBetween(itemStart + shown.start, itemStart + shown.end)}%"
 					>
-						<span class="pointer-events-none flex h-full items-center gap-1 px-1.5 text-[10px] whitespace-nowrap text-white">
-							{#if note}<span class="font-semibold">{note}</span>{/if}
-							<span class="opacity-70">{formatClock(shown.end - shown.start, 1)}</span>
+						<span class="pointer-events-none flex h-full items-center gap-1 px-1.5 text-[11px] whitespace-nowrap text-white">
+							<span class="font-medium">{track.label.name}</span>
+							{#if note}<span class="text-white/80">· {note}</span>{/if}
+							<span class="opacity-60">{formatClock(shown.end - shown.start, 1)}</span>
 						</span>
 						<div role="presentation" class="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize bg-white/0 hover:bg-white/50" onpointerdown={(event) => startEdit(event, range, 'start')}></div>
 						<div role="presentation" class="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize bg-white/0 hover:bg-white/50" onpointerdown={(event) => startEdit(event, range, 'end')}></div>
