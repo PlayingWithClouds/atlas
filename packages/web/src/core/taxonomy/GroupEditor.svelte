@@ -148,7 +148,7 @@
 	</dl>
 
 	<div>
-		<div class="text-faint border-line grid grid-cols-[2.5rem_minmax(8rem,1fr)_2fr_1.75rem_1.75rem] gap-1 border-b pb-1.5 text-[11px] font-medium tracking-wide uppercase">
+		<div class="text-faint border-line grid grid-cols-[2.5rem_minmax(8rem,1fr)_2fr_1.75rem_1.75rem] gap-1 border-b pb-1.5 text-2xs font-medium tracking-wide uppercase">
 			<span class="text-center">Key</span>
 			<span class="px-2">Label · {group.labels.length}</span>
 			<span class="px-2">Description</span>

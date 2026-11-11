@@ -8,6 +8,21 @@ import type { Bindings, Keymap } from '../labeling/keyboardMap';
 import { DEFAULT_LEADER, buildKeymap } from '../labeling/keyboardMap';
 
 const STORAGE_KEY = 'atlas-settings';
+/** Text size depends on the screen, so it stays per browser and is not shared. */
+const TEXT_SCALE_KEY = 'atlas-text-scale';
+export const TEXT_SCALE_MIN = 0.85;
+export const TEXT_SCALE_MAX = 1.6;
+
+function storedTextScale(): number {
+  if (typeof localStorage === 'undefined') {
+    return 1;
+  }
+  const value = Number(localStorage.getItem(TEXT_SCALE_KEY));
+  if (!Number.isFinite(value) || value < TEXT_SCALE_MIN || value > TEXT_SCALE_MAX) {
+    return 1;
+  }
+  return value;
+}
 const SERVER_PATH = '/settings/web';
 /** Edits in quick succession (typing a number) go to the server once. */
 const SAVE_DELAY_MS = 400;
@@ -69,6 +84,8 @@ class SettingsState {
   value = $state<Settings>(stored());
   readonly keymap: Keymap = $derived(buildKeymap(this.value.bindings, this.value.leader));
   sync = $state<SyncState>('offline');
+  /** Multiplies every font size and the rem unit (app.css --text-scale); this browser only. */
+  textScale = $state(storedTextScale());
   private api: ApiClient | undefined;
   private saveTimer: ReturnType<typeof setTimeout> | undefined;
   /** A save failed: the local copy is newer, so the next contact pushes instead of pulling. */
@@ -136,6 +153,17 @@ class SettingsState {
     const bindings = { ...this.value.bindings };
     delete bindings[commandId];
     this.update({ bindings });
+  }
+
+  setTextScale(scale: number): void {
+    const clamped = Math.min(TEXT_SCALE_MAX, Math.max(TEXT_SCALE_MIN, scale));
+    this.textScale = Math.round(clamped * 100) / 100;
+    localStorage.setItem(TEXT_SCALE_KEY, String(this.textScale));
+    this.applyTextScale();
+  }
+
+  applyTextScale(): void {
+    document.documentElement.style.setProperty('--text-scale', String(this.textScale));
   }
 
   resetAll(): void {

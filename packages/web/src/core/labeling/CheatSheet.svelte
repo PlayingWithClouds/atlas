@@ -21,7 +21,7 @@
 <dialog bind:this={dialog} class="modal" onclose={onclose}>
 	<div class="modal-box max-w-xl">
 		<h2 class="text-default mb-3 text-lg font-semibold">Keyboard</h2>
-		<table class="w-full text-[15px]">
+		<table class="w-full text-[length:calc(15px*var(--text-scale))]">
 			<tbody>
 				{#each keyHelp(settings.keymap) as entry (entry.action)}
 					<tr class="border-line border-b last:border-b-0">

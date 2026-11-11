@@ -70,10 +70,10 @@
 		<img src={label.image} alt="" loading="lazy" class="-ml-1 h-6 w-6 shrink-0 rounded object-cover" />
 	{/if}
 	<span class="min-w-0 flex-1 truncate">{label.name}</span>
-	{#if label.deprecated}<span class="text-[11px] uppercase opacity-60">old</span>{/if}
+	{#if label.deprecated}<span class="text-2xs uppercase opacity-60">old</span>{/if}
 	{#if hasRange}<ClockIcon size={12} class={selected ? '' : 'text-violet'} />{/if}
 	{#if proposed}
-		<span class="font-mono text-[11px] tabular-nums {strong ? 'text-green' : 'text-dim'}">{percent}</span>
+		<span class="font-mono text-2xs tabular-nums {strong ? 'text-green' : 'text-dim'}">{percent}</span>
 	{/if}
-	{#if badge}<span class="text-dim shrink-0 font-mono text-[11px]">{badge}</span>{/if}
+	{#if badge}<span class="text-dim shrink-0 font-mono text-2xs">{badge}</span>{/if}
 </button>

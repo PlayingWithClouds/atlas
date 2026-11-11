@@ -215,7 +215,7 @@
 							{#if entry.depth === 1}<span class="text-violet text-xs">↳</span>{/if}
 							<span class="min-w-0 flex-1">
 								<span class="block truncate text-sm {entry.group.primary ? 'font-medium' : ''}">{groupName(entry.group)}</span>
-								<span class="text-faint block truncate text-[11px]">{summaryOf(entry.group)}</span>
+								<span class="text-faint block truncate text-2xs">{summaryOf(entry.group)}</span>
 							</span>
 							{#if entry.group.primary}<span class="bg-green size-1.5 shrink-0 rounded-full" title="Primary"></span>{/if}
 						</button>

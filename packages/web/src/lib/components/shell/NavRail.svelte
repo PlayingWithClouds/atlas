@@ -29,7 +29,7 @@
 	>
 		<MagnifyingGlassIcon size={13} />
 		<span class="flex-1 text-left">Search…</span>
-		<kbd class="border-line rounded border px-1 text-[10px]">⌘K</kbd>
+		<kbd class="border-line rounded border px-1 text-[length:calc(10px*var(--text-scale))]">⌘K</kbd>
 	</button>
 
 	<nav class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">

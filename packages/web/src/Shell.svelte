@@ -5,6 +5,7 @@
 	import { provideKernelContext } from './kernel/context';
 	import { palette } from './kernel/palette.svelte';
 	import { theme } from './kernel/theme.svelte';
+	import { settings } from './core/settings/settings.svelte';
 	import AppShell from './lib/components/shell/AppShell.svelte';
 	import CommandMenu from './lib/components/CommandMenu.svelte';
 	import CommandPalette from './lib/components/CommandPalette.svelte';
@@ -28,6 +29,11 @@
 
 	$effect(() => {
 		theme.apply();
+	});
+
+	$effect(() => {
+		void settings.textScale;
+		settings.applyTextScale();
 	});
 
 	function onKeydown(event: KeyboardEvent) {

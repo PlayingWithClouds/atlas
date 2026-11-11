@@ -107,10 +107,10 @@
 		<div class="flex items-center gap-2">
 			<StatusChip status={view.status} />
 			{#if view.item.span}
-				<span class="text-dim font-mono text-[11px]">{formatSpan(view.item.span)}</span>
+				<span class="text-dim font-mono text-2xs">{formatSpan(view.item.span)}</span>
 			{/if}
 			{#if view.priority !== undefined}
-				<span class="text-faint ml-auto font-mono text-[11px]" title="Priority">p {view.priority.toFixed(2)}</span>
+				<span class="text-faint ml-auto font-mono text-2xs" title="Priority">p {view.priority.toFixed(2)}</span>
 			{/if}
 		</div>
 	</div>
