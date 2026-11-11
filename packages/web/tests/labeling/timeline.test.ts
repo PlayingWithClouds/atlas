@@ -14,6 +14,7 @@ import {
   ticksOf,
   timelineWindow,
   zoomWindow,
+  rangesFromHere,
 } from '../../src/core/labeling/timeline';
 import { formatClock } from '../../src/core/shared/time';
 import { taxonomy } from './fixtures';
@@ -180,5 +181,23 @@ describe('formatClock', () => {
     expect(formatClock(3725)).toBe('1:02:05');
     expect(formatClock(5.25, 1)).toBe('0:05.2');
     expect(formatClock(-3)).toBe('0:00');
+  });
+});
+
+describe('rangesFromHere', () => {
+  const ghost = (label: string, start: number, end: number, score = 0.8) => ({ group: 'activity', label, start, end, score });
+
+  test('takes every suggestion under the playhead, from here to its end', () => {
+    const taken = rangesFromHere([ghost('talking', 2, 10), ghost('dancing', 4, 6), ghost('talking', 12, 14)], [], 5, 0.2);
+    expect(taken).toEqual([
+      { group: 'activity', label: 'talking', start: 5, end: 10 },
+      { group: 'activity', label: 'dancing', start: 5, end: 6 },
+    ]);
+  });
+
+  test('skips faint suggestions, labels already on here, and leftovers too short', () => {
+    expect(rangesFromHere([ghost('talking', 2, 10, 0.1)], [], 5, 0.2)).toEqual([]);
+    expect(rangesFromHere([ghost('talking', 2, 10)], [{ group: 'activity', label: 'talking', start: 4, end: 6 }], 5, 0.2)).toEqual([]);
+    expect(rangesFromHere([ghost('talking', 2, 5.1)], [], 5, 0.2)).toEqual([]);
   });
 });

@@ -33,9 +33,11 @@ describe('actionForKey', () => {
 
   test('the item actions', () => {
     expect(actionForKey(press(' '), labels)).toEqual({ kind: 'togglePlay' });
-    expect(actionForKey(press('Enter'), labels)).toEqual({ kind: 'save' });
-    expect(actionForKey(press('s'), labels)).toEqual({ kind: 'skip' });
-    expect(actionForKey(press('S', { shiftKey: true }), labels)).toEqual({ kind: 'skip' });
+    expect(actionForKey(press('Enter', { altKey: true }), labels)).toEqual({ kind: 'save' });
+    expect(actionForKey(press('Escape', { altKey: true }), labels)).toEqual({ kind: 'skip' });
+    expect(actionForKey(press('Enter'), labels)).toBeUndefined();
+    expect(actionForKey(press('s'), labels)).toEqual({ kind: 'acceptHere' });
+    expect(actionForKey(press('S', { shiftKey: true }), labels)).toEqual({ kind: 'acceptHere' });
     expect(actionForKey(press('Backspace'), labels)).toEqual({ kind: 'clearGroup' });
     expect(actionForKey(press('a'), labels)).toEqual({ kind: 'acceptProposals' });
     expect(actionForKey(press('c'), labels)).toEqual({ kind: 'copyPrevious' });
@@ -63,7 +65,7 @@ describe('actionForKey', () => {
 
   test('reserved keys win over label hotkeys, which stay reachable by digit', () => {
     const clashing: KeyedLabel[] = [{ id: 'sleepy', hotkey: 's' }];
-    expect(actionForKey(press('s'), clashing)).toEqual({ kind: 'skip' });
+    expect(actionForKey(press('s'), clashing)).toEqual({ kind: 'acceptHere' });
     expect(actionForKey(press('1'), clashing)).toEqual({ kind: 'toggleLabel', labelId: 'sleepy' });
     expect(isReservedHotkey('s')).toBe(true);
     expect(isReservedHotkey('t')).toBe(false);

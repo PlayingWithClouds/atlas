@@ -497,7 +497,7 @@
 
 	<!-- ruler: filmstrip, item span, trim, ticks -->
 	<div class="grid grid-cols-[var(--gutter)_1fr] items-stretch gap-2">
-		<div class="text-dim flex flex-col justify-center text-right font-mono text-xs leading-snug tabular-nums">
+		<div class="text-dim flex flex-col justify-center text-right font-mono text-sm leading-snug tabular-nums">
 			<span class="text-default">{formatClock(playhead, 2)}</span>
 			<span>f{Math.floor(playhead * frameRate + 1e-3)} · {Math.round(frameRate * 100) / 100} fps</span>
 		</div>
@@ -525,7 +525,7 @@
 			<div class="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-black/40">
 				{#each ticks as tick (tick)}
 					<div class="absolute bottom-0 h-full border-l border-white/20" style="left: {left(tick)}%">
-						<span class="text-dim absolute bottom-0.5 left-1 font-mono text-[11px] whitespace-nowrap">{formatClock(tick, tickDecimals)}</span>
+						<span class="text-dim absolute bottom-0.5 left-1 font-mono text-xs whitespace-nowrap">{formatClock(tick, tickDecimals)}</span>
 					</div>
 				{/each}
 			</div>
@@ -543,7 +543,7 @@
 				onmousedown={(event) => event.preventDefault()}
 				onclick={() => onarm({ group: track.group.id, label: track.label.id })}
 				title={trackTitle(track)}
-				class="flex min-w-0 items-center justify-end gap-1.5 text-right text-xs leading-tight {track.armed ? 'text-default' : 'text-dim hover:text-muted'}"
+				class="flex min-w-0 items-center justify-end gap-1.5 text-right text-sm leading-tight {track.armed ? 'text-default' : 'text-dim hover:text-muted'}"
 			>
 				{#if track.refines}
 					<span class="text-violet">↳</span>
@@ -560,7 +560,7 @@
 				title={trackTitle(track)}
 			>
 				{#if track.whole}
-					<div class="bg-violet/25 border-violet/50 pointer-events-none absolute inset-y-0.5 flex items-center rounded-sm border border-dashed gap-1 overflow-hidden px-1.5 text-xs whitespace-nowrap text-white" style="left: {left(wholeSpan().start)}%; width: {widthBetween(wholeSpan().start, wholeSpan().end)}%">
+					<div class="bg-violet/25 border-violet/50 pointer-events-none absolute inset-y-0.5 flex items-center rounded-sm border border-dashed gap-1 overflow-hidden px-1.5 text-sm whitespace-nowrap text-white" style="left: {left(wholeSpan().start)}%; width: {widthBetween(wholeSpan().start, wholeSpan().end)}%">
 						<span class="font-medium">{track.label.name}</span>
 						{#if track.wholeNote}<span class="text-white/80">· {track.wholeNote}</span>{/if}
 						{#if track.armed}<span class="ml-auto pl-2 text-white/40">entire scene · drag inside to mark only parts</span>{/if}
@@ -575,7 +575,7 @@
 						onpointerdown={(event) => event.stopPropagation()}
 						onclick={() => onaccept(ghost)}
 						title="Suggested ({Math.round(ghost.score * 100)} %): click to take it"
-						class="border-violet text-violet hover:bg-violet/20 absolute inset-y-0.5 overflow-hidden rounded-sm border border-dashed px-1 text-left text-[10px] leading-4 whitespace-nowrap"
+						class="border-violet text-violet hover:bg-violet/20 absolute inset-y-0.5 overflow-hidden rounded-sm border border-dashed px-1 text-left text-[11px] leading-4 whitespace-nowrap"
 						style="left: {left(itemStart + ghost.start)}%; width: {widthBetween(itemStart + ghost.start, itemStart + ghost.end)}%"
 					>
 						{Math.round(ghost.score * 100)} %
@@ -595,7 +595,7 @@
 						class="group/bar absolute inset-y-0 cursor-grab rounded-sm {barClass(range)}"
 						style="left: {left(itemStart + shown.start)}%; width: {widthBetween(itemStart + shown.start, itemStart + shown.end)}%"
 					>
-						<span class="pointer-events-none flex h-full items-center gap-1 overflow-hidden px-2 text-xs whitespace-nowrap text-white">
+						<span class="pointer-events-none flex h-full items-center gap-1 overflow-hidden px-2 text-sm whitespace-nowrap text-white">
 							<span class="font-medium">{track.label.name}</span>
 							{#if note}<span class="text-white/80">· {note}</span>{/if}
 							<span class="opacity-60">{formatClock(shown.end - shown.start, 1)}</span>
@@ -627,7 +627,7 @@
 	{#if tracks.length === 0}
 		<div class="grid grid-cols-[var(--gutter)_1fr] gap-2">
 			<span></span>
-			<span class="text-faint border-line rounded border border-dashed px-2 py-1 text-[11px]">Pick a label on the right: its track shows up here, and dragging in it limits the label to a range.</span>
+			<span class="text-faint border-line rounded border border-dashed px-2 py-1 text-xs">Pick a label on the right: its track shows up here, and dragging in it limits the label to a range.</span>
 		</div>
 	{/if}
 
@@ -637,14 +637,9 @@
 		<div class="pointer-events-none absolute inset-y-0 z-20 w-px bg-white/30" style="left: {hover.x}px"></div>
 	{/if}
 
-	<div class="text-faint grid grid-cols-[var(--gutter)_1fr] items-center gap-2 text-[11px]">
-		<div class="flex justify-end gap-0.5">
-			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" onmousedown={(event) => event.preventDefault()} onclick={() => zoomBy(1.6)} title="Zoom out (wheel)"><MagnifyingGlassMinusIcon size={14} /></button>
-			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" onmousedown={(event) => event.preventDefault()} onclick={() => zoomBy(1 / 1.6)} title="Zoom in around the playhead (wheel)"><MagnifyingGlassPlusIcon size={14} /></button>
-			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" disabled={!zoomed} onmousedown={(event) => event.preventDefault()} onclick={fit} title="Fit the item"><ArrowsOutLineHorizontalIcon size={14} /></button>
-		</div>
+	<div class="text-faint flex items-center gap-2 text-xs">
 		{#if selected}
-			<div class="flex min-w-0 flex-wrap items-center gap-1.5">
+			<div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
 				<span class="text-default font-medium">{selectedName(selected)}</span>
 				<span class="font-mono tabular-nums">{formatClock(itemStart + selected.start, 2)}–{formatClock(itemStart + selected.end, 2)}</span>
 				{#each selectedRefinements as refinement (refinement.group.id)}
@@ -673,8 +668,13 @@
 				</button>
 			</div>
 		{:else}
-			<span class="truncate">Drag in a track to mark where a label holds · click a bar to edit it · <span class="font-mono">?</span> for all keys</span>
+			<span class="min-w-0 flex-1 truncate"><span class="font-mono">/</span> start a label at the playhead · <span class="font-mono">]</span> end it · <span class="font-mono">S</span> take the suggestion from here · drag in a track or a bar's edges · <span class="font-mono">?</span> all keys</span>
 		{/if}
+		<div class="flex shrink-0 gap-0.5">
+			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" onmousedown={(event) => event.preventDefault()} onclick={() => zoomBy(1.6)} title="Zoom out (wheel)"><MagnifyingGlassMinusIcon size={14} /></button>
+			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" onmousedown={(event) => event.preventDefault()} onclick={() => zoomBy(1 / 1.6)} title="Zoom in around the playhead (wheel)"><MagnifyingGlassPlusIcon size={14} /></button>
+			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" disabled={!zoomed} onmousedown={(event) => event.preventDefault()} onclick={fit} title="Fit the item"><ArrowsOutLineHorizontalIcon size={14} /></button>
+		</div>
 	</div>
 </div>
 
@@ -689,7 +689,7 @@
 		background: rgb(0 0 0 / 0.8);
 		padding: 0.0625rem 0.25rem;
 		font-family: var(--font-mono, ui-monospace, monospace);
-		font-size: 10px;
+		font-size: 11px;
 		font-variant-numeric: tabular-nums;
 		color: white;
 		white-space: nowrap;

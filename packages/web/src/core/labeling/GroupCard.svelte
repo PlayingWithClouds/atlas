@@ -127,21 +127,21 @@
 		<span class="text-faint shrink-0">
 			{#if expanded}<CaretDownIcon size={12} />{:else}<CaretRightIcon size={12} />{/if}
 		</span>
-		<span class="text-default shrink-0 text-sm font-semibold">{group.label}</span>
+		<span class="text-default shrink-0 text-[15px] font-semibold">{group.label}</span>
 		{#if expanded}
-			<span class="text-faint flex-1 text-[11px]">{kindHint(group)}</span>
+			<span class="text-faint flex-1 text-xs">{kindHint(group)}</span>
 		{:else}
 			<span class="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
 				{#each summary as entry (entry.id)}
-					<span class="bg-raised text-default flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs">
+					<span class="bg-raised text-default flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-sm">
 						{#if entry.partial}<ClockIcon size={11} class="text-violet" />{/if}{entry.text}
 					</span>
 				{/each}
 				{#each proposals as entry (entry.label.id)}
-					<span class="border-green/60 text-muted shrink-0 rounded border border-dashed px-1.5 py-0.5 text-xs">{entry.label.name} {Math.round(Number(entry.probability) * 100)}%</span>
+					<span class="border-green/60 text-muted shrink-0 rounded border border-dashed px-1.5 py-0.5 text-sm">{entry.label.name} {Math.round(Number(entry.probability) * 100)}%</span>
 				{/each}
 				{#if summary.length === 0 && proposals.length === 0}
-					<span class="text-faint text-xs">{#if reviewed}none{:else}unknown{/if}</span>
+					<span class="text-faint text-sm">{#if reviewed}none{:else}unknown{/if}</span>
 				{/if}
 			</span>
 		{/if}
@@ -157,17 +157,17 @@
 				{@const refinementUncertainty = uncertaintyOf(suggestion, refinement)}
 				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 				<div class="border-violet/60 rounded-r-md border-l-2 py-1.5 pr-1 pl-3 {focusedHere ? 'bg-violet/10' : ''}" onclick={() => onfocus(refinement.id)}>
-					<div class="mb-1.5 flex items-center gap-2 text-xs">
+					<div class="mb-1.5 flex items-center gap-2 text-sm">
 						<span class="text-violet">↳ {parentLabelName(refinement)}</span>
 						<span class="font-semibold {focusedHere ? 'text-default' : 'text-muted'}">{refinement.label}</span>
-						<span class="text-faint flex-1 text-[11px]">{kindHint(refinement)}</span>
+						<span class="text-faint flex-1 text-xs">{kindHint(refinement)}</span>
 					{#if refinementUncertainty !== undefined}<UncertaintyMeter uncertainty={refinementUncertainty} />{/if}
 					</div>
 					<LabelGrid group={refinement} {draft} {suggestion} columns={columnsFor(refinement)} ontoggle={(labelId) => ontoggle(refinement, labelId)} />
 				</div>
 			{/each}
 
-			<label class="text-dim flex items-center gap-1.5 self-end text-[11px] {holdsLabels ? 'opacity-40' : ''}" title="Reviewed groups tell trainers 'none of these'; unreviewed ones stay unknown (U)">
+			<label class="text-dim flex items-center gap-1.5 self-end text-xs {holdsLabels ? 'opacity-40' : ''}" title="Reviewed groups tell trainers 'none of these'; unreviewed ones stay unknown (U)">
 				<input type="checkbox" class="toggle toggle-xs" checked={reviewed} disabled={holdsLabels} onchange={(event) => onreviewed(group.id, event.currentTarget.checked)} />
 				reviewed
 			</label>

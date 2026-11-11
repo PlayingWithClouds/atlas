@@ -20,7 +20,7 @@
 <dialog bind:this={dialog} class="modal" onclose={onclose}>
 	<div class="modal-box max-w-xl">
 		<h2 class="text-default mb-3 text-lg font-semibold">Keyboard</h2>
-		<table class="w-full text-sm">
+		<table class="w-full text-[15px]">
 			<tbody>
 				{#each KEY_HELP as entry (entry.action)}
 					<tr class="border-line border-b last:border-b-0">
@@ -32,7 +32,7 @@
 				{/each}
 			</tbody>
 		</table>
-		<p class="text-dim mt-3 text-xs">
+		<p class="text-dim mt-3 text-sm">
 			A group counts as reviewed while it is on screen (primary, or inside an open More groups) unless you mark it not reviewed. Suggestions are proposals only: nothing is selected until you accept it.
 		</p>
 		<div class="modal-action">

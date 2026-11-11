@@ -21,5 +21,5 @@
 	<span class="bg-raised h-1 w-8 overflow-hidden rounded-full">
 		<span class="block h-full rounded-full {tone.bar}" style="width: {Math.max(percent, 4)}%"></span>
 	</span>
-	<span class="w-7 text-right font-mono text-[10px] tabular-nums {tone.text}">{percent}%</span>
+	<span class="w-8 text-right font-mono text-[11px] tabular-nums {tone.text}">{percent}%</span>
 </span>

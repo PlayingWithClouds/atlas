@@ -125,7 +125,7 @@
 						{#if media.frame && lastPreviewSeconds !== undefined}
 							<div class="pointer-events-none absolute inset-0 z-10 bg-black {previewSeconds === undefined ? 'invisible' : ''}">
 								<media.frame asset={detail.asset} seconds={lastPreviewSeconds} />
-								<span class="absolute top-3 left-1/2 -translate-x-1/2 rounded-md bg-black/70 px-2.5 py-1 font-mono text-sm text-white tabular-nums">{formatClock(lastPreviewSeconds, 2)}</span>
+								<span class="absolute top-3 left-1/2 -translate-x-1/2 rounded-md bg-black/70 px-2.5 py-1 font-mono text-[15px] text-white tabular-nums">{formatClock(lastPreviewSeconds, 2)}</span>
 							</div>
 						{/if}
 					{:else}
@@ -162,13 +162,13 @@
 							ondelete={(range) => session.deleteRange(range)}
 						/>
 						{#if session.loopedRange}
-							<div class="text-amber flex items-center gap-2 text-xs">
+							<div class="text-amber flex items-center gap-2 text-sm">
 								Looping {session.loopedRange.group}.{session.loopedRange.label} only
-								<button type="button" tabindex="-1" class="btn btn-ghost btn-xs" onclick={() => session.cancelRange()}>Back to the whole item <kbd class="ml-1 font-mono text-[10px] opacity-60">Esc</kbd></button>
+								<button type="button" tabindex="-1" class="btn btn-ghost btn-xs" onclick={() => session.cancelRange()}>Back to the whole item <kbd class="ml-1 font-mono text-[11px] opacity-60">Esc</kbd></button>
 							</div>
 						{/if}
 						{#if session.draft.span}
-							<div class="text-amber flex items-center gap-2 text-xs">
+							<div class="text-amber flex items-center gap-2 text-sm">
 								Trimmed to {formatSpan(session.draft.span)} (recorded with the label; the item itself is unchanged)
 								<button type="button" tabindex="-1" class="btn btn-ghost btn-xs" onclick={() => session.resetTrim()}>Reset</button>
 							</div>
@@ -186,20 +186,20 @@
 
 				<div class="border-line flex flex-col gap-2 border-t p-3">
 					{#if problemLines.length}
-						<div class="alert alert-error flex-col items-start gap-0.5 text-xs">
+						<div class="alert alert-error flex-col items-start gap-0.5 text-sm">
 							{#each problemLines as problem (problem)}<span>{problem}</span>{/each}
 						</div>
 					{/if}
 					{#if session.notice}
-						<div class="text-amber px-1 text-xs">{session.notice}</div>
+						<div class="text-amber px-1 text-sm">{session.notice}</div>
 					{/if}
 
 					<div class="flex gap-2">
 						<button type="button" tabindex="-1" class="btn flex-1" disabled={session.saving} onmousedown={(event) => event.preventDefault()} onclick={() => void session.save('skipped')}>
-							Skip <kbd class="ml-1 font-mono text-[10px] opacity-60">S</kbd>
+							Skip <kbd class="ml-1 font-mono text-[11px] opacity-60">Alt Esc</kbd>
 						</button>
 						<button type="button" tabindex="-1" class="btn btn-primary flex-[2]" disabled={session.saving || session.problems.length > 0} onmousedown={(event) => event.preventDefault()} onclick={() => void session.save('labeled')}>
-							Save and next <kbd class="ml-1 font-mono text-[10px] opacity-60">Enter</kbd>
+							Save and next <kbd class="ml-1 font-mono text-[11px] opacity-60">Alt Enter</kbd>
 						</button>
 					</div>
 				</div>

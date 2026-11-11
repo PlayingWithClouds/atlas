@@ -34,8 +34,8 @@
 		<ArrowLeftIcon size={15} />
 	</button>
 	<div class="min-w-0">
-		<div class="text-default truncate text-sm font-semibold" {title}>{title}</div>
-		<div class="text-dim flex items-center gap-2 font-mono text-[11px]">
+		<div class="text-default truncate text-[15px] font-semibold" {title}>{title}</div>
+		<div class="text-dim flex items-center gap-2 font-mono text-xs">
 			{#if detail.item.span}<span>{formatSpan(detail.item.span)}</span>{/if}
 			{#if detail.asset.duration !== undefined}<span>of {formatClock(detail.asset.duration)}</span>{/if}
 			{#if detail.asset.width && detail.asset.height}<span>{detail.asset.width}×{detail.asset.height}</span>{/if}
@@ -44,7 +44,7 @@
 	<StatusChip status={detail.status} />
 	{#if dirty}<span class="badge bg-amber-soft text-amber">unsaved</span>{/if}
 	<div class="ml-auto flex items-center gap-2">
-		<span class="text-dim text-xs"><span class="text-default font-semibold">{pending}</span> pending</span>
+		<span class="text-dim text-sm"><span class="text-default font-semibold">{pending}</span> pending</span>
 		<button type="button" class="btn btn-ghost btn-sm btn-square" disabled={detail.previous === undefined} onclick={() => onneighbour(-1)} aria-label="Previous scene of this video" title="Previous scene (Shift+←)">
 			<CaretLeftIcon size={14} />
 		</button>
