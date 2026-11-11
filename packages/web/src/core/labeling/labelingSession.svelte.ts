@@ -226,13 +226,17 @@ export class LabelingSession {
     this.restartPlayback(sameAsset);
   }
 
-  /** A new video loads itself from its span start; the same video just jumps to the new scene. */
+  /** A new video loads itself paused at its span start; the same video just jumps to the new scene, paused. */
   private restartPlayback(sameAsset: boolean): void {
     if (!sameAsset || this.handle === undefined || this.playSpan === undefined) {
       return;
     }
+    this.handle.pause();
     this.handle.seek(this.playSpan.start);
-    this.handle.play();
+  }
+
+  pause(): void {
+    this.handle?.pause();
   }
 
   /** Re-reads the item (new suggestions, neighbours) without touching what the person has typed. */

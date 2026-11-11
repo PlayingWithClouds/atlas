@@ -38,7 +38,8 @@
 		selectedRefinements,
 		onrefine,
 		ondelete,
-		onhover
+		onhover,
+		onscrub
 	}: {
 		asset: Asset;
 		media: MediaPlayerContribution | undefined;
@@ -68,6 +69,8 @@
 		ondelete: (range: Range) => void;
 		/** Asset seconds under the pointer while it hovers the timeline (not while dragging); the page previews that frame. */
 		onhover: (seconds: number | undefined) => void;
+		/** Scrubbing the ruler started: the player pauses so it stays where the pointer leaves it. */
+		onscrub: () => void;
 	} = $props();
 
 	const FILMSTRIP_CELL_PIXELS = 128;
@@ -213,9 +216,10 @@
 		hover = { seconds: secondsAtClientX(event.clientX), x: event.clientX - containerBox.left };
 	}
 
-	// The page shows the hovered frame in the player; dragging shows the real playhead instead.
+	// The page shows the hovered frame in the player (scrubbing too); dragging a bar's edge shows
+	// the real video, which seeks to that edge.
 	$effect(() => {
-		if (hover === undefined || drag !== undefined) {
+		if (hover === undefined || (drag !== undefined && drag.kind !== 'scrub')) {
 			onhover(undefined);
 			return;
 		}
@@ -242,6 +246,7 @@
 		}
 		event.preventDefault();
 		drag = { kind: 'scrub' };
+		onscrub();
 		onseek(secondsAtClientX(event.clientX));
 		follow(
 			(move) => onseek(secondsAtClientX(move.clientX)),
