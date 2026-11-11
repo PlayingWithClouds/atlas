@@ -410,6 +410,10 @@
 
 	// --- drawing helpers -------------------------------------------------------------------
 
+	/** Share of the lane before / after the current scene (or its trim), 0 when none is in view. */
+	const outsideBefore = $derived(Math.min(1, Math.max(0, left(wholeSpan().start) / 100)));
+	const outsideAfter = $derived(Math.min(1, Math.max(0, 1 - left(wholeSpan().end) / 100)));
+
 	function isDragging(range: Range): boolean {
 		return drag !== undefined && drag.kind === 'edit' && drag.range === range;
 	}
@@ -488,154 +492,165 @@
 <div
 	bind:this={container}
 	class="relative flex flex-col gap-1.5 select-none"
-	style="--gutter: 11rem"
+	style="--gutter: 11rem; --lane-left: calc(var(--gutter) + 0.5rem); --lane-width: calc(100% - var(--gutter) - 0.5rem)"
 	onpointermove={updateHover}
 	onpointerleave={() => (hover = undefined)}
 	role="group"
 	aria-label="Timeline"
 >
 
-	<!-- ruler: filmstrip, item span, trim, ticks -->
-	<div class="grid grid-cols-[var(--gutter)_1fr] items-stretch gap-2">
-		<div class="text-dim flex flex-col justify-center text-right font-mono text-sm leading-snug tabular-nums">
-			<span class="text-default">{formatClock(playhead, 2)}</span>
-			<span>f{Math.floor(playhead * frameRate + 1e-3)} · {Math.round(frameRate * 100) / 100} fps</span>
-		</div>
-		<div
-			bind:this={ruler}
-			bind:clientWidth={laneWidth}
-			role="slider"
-			tabindex="-1"
-			aria-label="Seek"
-			aria-valuenow={playhead}
-			onpointerdown={startScrub}
-			class="border-line bg-surface relative h-[6.25rem] cursor-col-resize overflow-hidden rounded-md border"
-		>
-			{#if media?.filmstrip}
-				<div class="pointer-events-none absolute inset-x-0 top-0 h-20 opacity-90">
-					<media.filmstrip {asset} start={axis.start} end={axis.end} count={filmstripCount} />
-				</div>
-			{/if}
-			<div class="pointer-events-none absolute top-0 left-0 h-12 bg-black/55" style="width: {left(itemSpan.start)}%"></div>
-			<div class="pointer-events-none absolute top-0 right-0 h-12 bg-black/55" style="width: {100 - left(itemSpan.end)}%"></div>
-			<div class="border-blue pointer-events-none absolute top-0 h-20 border-x-2" style="left: {left(itemSpan.start)}%; width: {widthBetween(itemSpan.start, itemSpan.end)}%" title="Item span"></div>
-			{#if trimmed}
-				<div class="border-amber pointer-events-none absolute top-1 h-18 border-x-2 border-dashed" style="left: {left(trimmed.start)}%; width: {widthBetween(trimmed.start, trimmed.end)}%" title="Trimmed span"></div>
-			{/if}
-			<div class="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-black/40">
-				{#each ticks as tick (tick)}
-					<div class="absolute bottom-0 h-full border-l border-white/20" style="left: {left(tick)}%">
-						<span class="text-dim absolute bottom-0.5 left-1 font-mono text-xs whitespace-nowrap">{formatClock(tick, tickDecimals)}</span>
-					</div>
-				{/each}
+	<!-- ruler and tracks share one box, so the dimming outside the scene covers both -->
+	<div class="relative flex flex-col gap-1.5">
+		<!-- ruler: filmstrip, item span, trim, ticks -->
+		<div class="grid grid-cols-[var(--gutter)_1fr] items-stretch gap-2">
+			<div class="text-dim flex flex-col justify-center text-right font-mono text-sm leading-snug tabular-nums">
+				<span class="text-default">{formatClock(playhead, 2)}</span>
+				<span>f{Math.floor(playhead * frameRate + 1e-3)} · {Math.round(frameRate * 100) / 100} fps</span>
 			</div>
-		</div>
-	</div>
-
-	<!-- one track per label -->
-	{#each tracks as track (`${track.group.id}.${track.label.id}`)}
-		{@const creating = creatingIn(track)}
-		{@const drawing = pendingIn(track)}
-		<div class="grid grid-cols-[var(--gutter)_1fr] items-center gap-2">
-			<button
-				type="button"
-				tabindex="-1"
-				onmousedown={(event) => event.preventDefault()}
-				onclick={() => onarm({ group: track.group.id, label: track.label.id })}
-				title={trackTitle(track)}
-				class="flex min-w-0 items-center justify-end gap-1.5 text-right text-sm leading-tight {track.armed ? 'text-default' : 'text-dim hover:text-muted'}"
-			>
-				{#if track.refines}
-					<span class="text-violet">↳</span>
-				{:else}
-					<span class="text-faint truncate">{track.group.label}</span>
-				{/if}
-				<span class="truncate font-medium">{track.label.name}</span>
-				{#if track.armed}<span class="bg-violet h-1.5 w-1.5 shrink-0 rounded-full" title="Armed: R and dragging use this label"></span>{/if}
-			</button>
 			<div
-				role="presentation"
-				onpointerdown={(event) => startCreate(event, track)}
-				class="bg-surface relative cursor-crosshair rounded {track.refines ? 'h-7' : 'h-9'} {track.armed ? 'ring-violet/50 ring-1' : ''}"
-				title={trackTitle(track)}
+				bind:this={ruler}
+				bind:clientWidth={laneWidth}
+				role="slider"
+				tabindex="-1"
+				aria-label="Seek"
+				aria-valuenow={playhead}
+				onpointerdown={startScrub}
+				class="border-line bg-surface relative h-[6.25rem] cursor-col-resize overflow-hidden rounded-md border"
 			>
-				{#if track.whole}
-					<div class="bg-violet/25 border-violet/50 pointer-events-none absolute inset-y-0.5 flex items-center rounded-sm border border-dashed gap-1 overflow-hidden px-1.5 text-sm whitespace-nowrap text-white" style="left: {left(wholeSpan().start)}%; width: {widthBetween(wholeSpan().start, wholeSpan().end)}%">
-						<span class="font-medium">{track.label.name}</span>
-						{#if track.wholeNote}<span class="text-white/80">· {track.wholeNote}</span>{/if}
-						{#if track.armed}<span class="ml-auto pl-2 text-white/40">entire scene · drag inside to mark only parts</span>{/if}
+				{#if media?.filmstrip}
+					<div class="pointer-events-none absolute inset-x-0 top-0 h-20 opacity-90">
+						<media.filmstrip {asset} start={axis.start} end={axis.end} count={filmstripCount} />
 					</div>
 				{/if}
-
-				{#each track.ghosts as ghost (ghost)}
-					<button
-						type="button"
-						tabindex="-1"
-						onmousedown={(event) => event.preventDefault()}
-						onpointerdown={(event) => event.stopPropagation()}
-						onclick={() => onaccept(ghost)}
-						title="Suggested ({Math.round(ghost.score * 100)} %): click to take it"
-						class="border-violet text-violet hover:bg-violet/20 absolute inset-y-0.5 overflow-hidden rounded-sm border border-dashed px-1 text-left text-[11px] leading-4 whitespace-nowrap"
-						style="left: {left(itemStart + ghost.start)}%; width: {widthBetween(itemStart + ghost.start, itemStart + ghost.end)}%"
-					>
-						{Math.round(ghost.score * 100)} %
-					</button>
-				{/each}
-
-				{#each track.ranges as range, index (range)}
-					{@const shown = shownRange(range)}
-					{@const note = track.rangeNotes[index]}
-					{@const active = range === selected || isDragging(range)}
-					<div
-						role="button"
-						tabindex="-1"
-						title="{describe(shown)}. Drag to move, edges to resize, double-click to loop it."
-						onpointerdown={(event) => startEdit(event, range, 'move')}
-						ondblclick={() => onloop(range)}
-						class="group/bar absolute inset-y-0 cursor-grab rounded-sm {barClass(range)}"
-						style="left: {left(itemStart + shown.start)}%; width: {widthBetween(itemStart + shown.start, itemStart + shown.end)}%"
-					>
-						<span class="pointer-events-none flex h-full items-center gap-1 overflow-hidden px-2 text-sm whitespace-nowrap text-white">
-							<span class="font-medium">{track.label.name}</span>
-							{#if note}<span class="text-white/80">· {note}</span>{/if}
-							<span class="opacity-60">{formatClock(shown.end - shown.start, 1)}</span>
-						</span>
-						<!-- Edge handles reach a few pixels past the bar, so short bars stay resizable. -->
-						<div role="presentation" class="absolute inset-y-0 -left-1.5 z-10 flex w-3 cursor-ew-resize justify-center" onpointerdown={(event) => startEdit(event, range, 'start')}>
-							<span class="my-1 w-1 rounded-full {active ? 'bg-white' : 'bg-white/0 group-hover/bar:bg-white/60'}"></span>
-						</div>
-						<div role="presentation" class="absolute inset-y-0 -right-1.5 z-10 flex w-3 cursor-ew-resize justify-center" onpointerdown={(event) => startEdit(event, range, 'end')}>
-							<span class="my-1 w-1 rounded-full {active ? 'bg-white' : 'bg-white/0 group-hover/bar:bg-white/60'}"></span>
-						</div>
-						{#if active}
-							<span class="edge-time right-full mr-1.5">{formatClock(itemStart + shown.start, 2)}</span>
-							<span class="edge-time left-full ml-1.5">{formatClock(itemStart + shown.end, 2)}</span>
-						{/if}
-					</div>
-				{/each}
-
-				{#if creating}
-					<div class="bg-violet/40 border-violet pointer-events-none absolute inset-y-0 rounded-sm border" style="left: {left(creating.start)}%; width: {widthBetween(creating.start, creating.end)}%"></div>
+				<div class="border-blue pointer-events-none absolute inset-y-0 z-10 border-x-2" style="left: {left(itemSpan.start)}%; width: {widthBetween(itemSpan.start, itemSpan.end)}%" title="Item span">
+					<div class="bg-blue h-1 w-full"></div>
+				</div>
+				{#if trimmed}
+					<div class="border-amber pointer-events-none absolute top-1 h-18 border-x-2 border-dashed" style="left: {left(trimmed.start)}%; width: {widthBetween(trimmed.start, trimmed.end)}%" title="Trimmed span"></div>
 				{/if}
-				{#if drawing}
-					<div class="border-violet bg-violet/20 pointer-events-none absolute inset-y-0 border-l-2 border-dashed" style="left: {left(drawing.start)}%; width: {widthBetween(drawing.start, drawing.end)}%"></div>
-				{/if}
+				<div class="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-black/40">
+					{#each ticks as tick (tick)}
+						<div class="absolute bottom-0 h-full border-l border-white/20" style="left: {left(tick)}%">
+							<span class="text-dim absolute bottom-0.5 left-1 font-mono text-xs whitespace-nowrap">{formatClock(tick, tickDecimals)}</span>
+						</div>
+					{/each}
+				</div>
 			</div>
 		</div>
-	{/each}
 
-	{#if tracks.length === 0}
-		<div class="grid grid-cols-[var(--gutter)_1fr] gap-2">
-			<span></span>
-			<span class="text-faint border-line rounded border border-dashed px-2 py-1 text-xs">Pick a label on the right: its track shows up here, and dragging in it limits the label to a range.</span>
-		</div>
-	{/if}
+		<!-- one track per label -->
+		{#each tracks as track (`${track.group.id}.${track.label.id}`)}
+			{@const creating = creatingIn(track)}
+			{@const drawing = pendingIn(track)}
+			<div class="grid grid-cols-[var(--gutter)_1fr] items-center gap-2">
+				<button
+					type="button"
+					tabindex="-1"
+					onmousedown={(event) => event.preventDefault()}
+					onclick={() => onarm({ group: track.group.id, label: track.label.id })}
+					title={trackTitle(track)}
+					class="flex min-w-0 items-center justify-end gap-1.5 text-right text-sm leading-tight {track.armed ? 'text-default' : 'text-dim hover:text-muted'}"
+				>
+					{#if track.refines}
+						<span class="text-violet">↳</span>
+					{:else}
+						<span class="text-faint truncate">{track.group.label}</span>
+					{/if}
+					<span class="truncate font-medium">{track.label.name}</span>
+					{#if track.armed}<span class="bg-violet h-1.5 w-1.5 shrink-0 rounded-full" title="Armed: R and dragging use this label"></span>{/if}
+				</button>
+				<div
+					role="presentation"
+					onpointerdown={(event) => startCreate(event, track)}
+					class="bg-surface relative cursor-crosshair rounded {track.refines ? 'h-7' : 'h-9'} {track.armed ? 'ring-violet/50 ring-1' : ''}"
+					title={trackTitle(track)}
+				>
+					{#if track.whole}
+						<div class="bg-violet/25 border-violet/50 pointer-events-none absolute inset-y-0.5 flex items-center rounded-sm border border-dashed gap-1 overflow-hidden px-1.5 text-sm whitespace-nowrap text-white" style="left: {left(wholeSpan().start)}%; width: {widthBetween(wholeSpan().start, wholeSpan().end)}%">
+							<span class="font-medium">{track.label.name}</span>
+							{#if track.wholeNote}<span class="text-white/80">· {track.wholeNote}</span>{/if}
+							{#if track.armed}<span class="ml-auto pl-2 text-white/40">entire scene · drag inside to mark only parts</span>{/if}
+						</div>
+					{/if}
 
-	<!-- playhead and hover line across ruler and tracks -->
-	<div class="pointer-events-none absolute inset-y-0 z-20 w-px bg-white" style="left: calc(var(--gutter) + 0.5rem + (100% - var(--gutter) - 0.5rem) * {left(playhead) / 100})"></div>
-	{#if hover}
-		<div class="pointer-events-none absolute inset-y-0 z-20 w-px bg-white/30" style="left: {hover.x}px"></div>
-	{/if}
+					{#each track.ghosts as ghost (ghost)}
+						<button
+							type="button"
+							tabindex="-1"
+							onmousedown={(event) => event.preventDefault()}
+							onpointerdown={(event) => event.stopPropagation()}
+							onclick={() => onaccept(ghost)}
+							title="Suggested ({Math.round(ghost.score * 100)} %): click to take it"
+							class="border-violet text-violet hover:bg-violet/20 absolute inset-y-0.5 overflow-hidden rounded-sm border border-dashed px-1 text-left text-[11px] leading-4 whitespace-nowrap"
+							style="left: {left(itemStart + ghost.start)}%; width: {widthBetween(itemStart + ghost.start, itemStart + ghost.end)}%"
+						>
+							{Math.round(ghost.score * 100)} %
+						</button>
+					{/each}
+
+					{#each track.ranges as range, index (range)}
+						{@const shown = shownRange(range)}
+						{@const note = track.rangeNotes[index]}
+						{@const active = range === selected || isDragging(range)}
+						<div
+							role="button"
+							tabindex="-1"
+							title="{describe(shown)}. Drag to move, edges to resize, double-click to loop it."
+							onpointerdown={(event) => startEdit(event, range, 'move')}
+							ondblclick={() => onloop(range)}
+							class="group/bar absolute inset-y-0 cursor-grab rounded-sm {barClass(range)}"
+							style="left: {left(itemStart + shown.start)}%; width: {widthBetween(itemStart + shown.start, itemStart + shown.end)}%"
+						>
+							<span class="pointer-events-none flex h-full items-center gap-1 overflow-hidden px-2 text-sm whitespace-nowrap text-white">
+								<span class="font-medium">{track.label.name}</span>
+								{#if note}<span class="text-white/80">· {note}</span>{/if}
+								<span class="opacity-60">{formatClock(shown.end - shown.start, 1)}</span>
+							</span>
+							<!-- Edge handles reach a few pixels past the bar, so short bars stay resizable. -->
+							<div role="presentation" class="absolute inset-y-0 -left-1.5 z-10 flex w-3 cursor-ew-resize justify-center" onpointerdown={(event) => startEdit(event, range, 'start')}>
+								<span class="my-1 w-1 rounded-full {active ? 'bg-white' : 'bg-white/0 group-hover/bar:bg-white/60'}"></span>
+							</div>
+							<div role="presentation" class="absolute inset-y-0 -right-1.5 z-10 flex w-3 cursor-ew-resize justify-center" onpointerdown={(event) => startEdit(event, range, 'end')}>
+								<span class="my-1 w-1 rounded-full {active ? 'bg-white' : 'bg-white/0 group-hover/bar:bg-white/60'}"></span>
+							</div>
+							{#if active}
+								<span class="edge-time right-full mr-1.5">{formatClock(itemStart + shown.start, 2)}</span>
+								<span class="edge-time left-full ml-1.5">{formatClock(itemStart + shown.end, 2)}</span>
+							{/if}
+						</div>
+					{/each}
+
+					{#if creating}
+						<div class="bg-violet/40 border-violet pointer-events-none absolute inset-y-0 rounded-sm border" style="left: {left(creating.start)}%; width: {widthBetween(creating.start, creating.end)}%"></div>
+					{/if}
+					{#if drawing}
+						<div class="border-violet bg-violet/20 pointer-events-none absolute inset-y-0 border-l-2 border-dashed" style="left: {left(drawing.start)}%; width: {widthBetween(drawing.start, drawing.end)}%"></div>
+					{/if}
+				</div>
+			</div>
+		{/each}
+
+		{#if tracks.length === 0}
+			<div class="grid grid-cols-[var(--gutter)_1fr] gap-2">
+				<span></span>
+				<span class="text-faint border-line rounded border border-dashed px-2 py-1 text-xs">Pick a label on the right: its track shows up here, and dragging in it limits the label to a range.</span>
+			</div>
+		{/if}
+
+		<!-- everything outside the current scene (or its trim), grayed out across ruler and tracks -->
+		{#if outsideBefore > 0}
+			<div class="outside" style="left: var(--lane-left); width: calc(var(--lane-width) * {outsideBefore})"></div>
+		{/if}
+		{#if outsideAfter > 0}
+			<div class="outside" style="right: 0; width: calc(var(--lane-width) * {outsideAfter})"></div>
+		{/if}
+
+		<!-- playhead and hover line across ruler and tracks -->
+		<div class="pointer-events-none absolute inset-y-0 z-20 w-px bg-white" style="left: calc(var(--lane-left) + var(--lane-width) * {left(playhead) / 100})"></div>
+		{#if hover}
+			<div class="pointer-events-none absolute inset-y-0 z-20 w-px bg-white/30" style="left: {hover.x}px"></div>
+		{/if}
+	</div>
 
 	<div class="text-faint flex items-center gap-2 text-xs">
 		{#if selected}
@@ -679,6 +694,16 @@
 </div>
 
 <style>
+	.outside {
+		pointer-events: none;
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		z-index: 15;
+		background: color-mix(in srgb, var(--bg) 72%, transparent);
+		backdrop-filter: grayscale(1);
+	}
+
 	.edge-time {
 		pointer-events: none;
 		position: absolute;
