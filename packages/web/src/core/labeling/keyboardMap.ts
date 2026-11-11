@@ -18,6 +18,23 @@ export interface KeyPress {
   afterLeader?: boolean;
 }
 
+/**
+ * A plain copy of a press. KeyboardEvent keeps `key`, `shiftKey` … as getters on its prototype,
+ * so `{ ...event }` copies none of them: always copy through this instead of spreading.
+ */
+export function pressOf(event: KeyPress, change: Partial<KeyPress> = {}): KeyPress {
+  return {
+    key: event.key,
+    shiftKey: event.shiftKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    altKey: event.altKey,
+    repeat: event.repeat,
+    afterLeader: event.afterLeader,
+    ...change,
+  };
+}
+
 /** A label of the focused group, in the order shown. */
 export interface KeyedLabel {
   id: string;
@@ -218,7 +235,7 @@ export function chordToRecord(press: KeyPress): string | undefined {
   // A printable key already carries its Shift ("$"), letters aside ("Shift+f").
   const printable = press.key.length === 1 && press.key.toLowerCase() === press.key.toUpperCase();
   if (printable) {
-    return chordsOfPress({ ...press, shiftKey: false })[0];
+    return chordsOfPress(pressOf(press, { shiftKey: false }))[0];
   }
   return chordsOfPress(press)[0];
 }
