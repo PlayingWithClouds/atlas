@@ -117,9 +117,9 @@
 	<div class="flex h-full min-h-0 flex-col">
 		<ItemHeader {detail} {pending} dirty={session.dirty} onleave={() => session.leave()} onneighbour={(offset) => session.openNeighbour(offset)} />
 
-		<div class="flex min-h-0 flex-1 gap-4 p-4 {session.loading ? 'opacity-60' : ''}">
-			<div class="flex min-w-0 flex-1 flex-col gap-3">
-				<div class="border-line relative min-h-0 flex-1 overflow-hidden rounded-lg border bg-black">
+		<div class="flex min-h-0 flex-1 {session.loading ? 'opacity-60' : ''}">
+			<div class="flex min-w-0 flex-1 flex-col gap-3 pb-1">
+				<div class="relative min-h-0 flex-1 overflow-hidden bg-black">
 					{#if media}
 						<media.player asset={detail.asset} span={session.playSpan} poster={detail.item.poster} onready={(handle) => session.setHandle(handle)} ontime={(seconds) => (session.playhead = seconds)} />
 						{#if media.frame && lastPreviewSeconds !== undefined}
@@ -134,74 +134,77 @@
 				</div>
 
 				{#if showTimeline && itemSpan}
-					<Timeline
-						asset={detail.asset}
-						{media}
-						{itemSpan}
-						trimmed={session.draft.span}
-						playhead={session.playhead}
-						frameRate={session.frameRate()}
-						tracks={session.tracks}
-						pending={session.pendingRange}
-						itemStart={session.itemStart}
-						length={session.length}
-						selected={session.selectedRange}
-						looped={session.loopedRange}
-						onseek={(seconds) => session.seekTo(seconds)}
-						onselect={(range) => session.selectRange(range)}
-						onloop={(range) => session.toggleLoop(range)}
-						oncreate={(target, first, second) => session.createRange(target, first, second)}
-						onchange={(previous, next) => session.replaceRange(previous, next)}
-						onaccept={(ghost) => session.acceptSuggestedRange(ghost)}
-						onarm={(target) => session.armLabel(target)}
-						selectedRefinements={session.selectedRefinements}
-						onrefine={(target) => session.refineSelected(target)}
-						onhover={setPreview}
-						onscrub={() => session.pause()}
-						ondelete={(range) => session.deleteRange(range)}
-					/>
-					{#if session.loopedRange}
-						<div class="text-amber flex items-center gap-2 text-xs">
-							Looping {session.loopedRange.group}.{session.loopedRange.label} only
-							<button type="button" tabindex="-1" class="btn btn-ghost btn-xs" onclick={() => session.cancelRange()}>Back to the whole item <kbd class="ml-1 font-mono text-[10px] opacity-60">Esc</kbd></button>
-						</div>
-					{/if}
-					{#if session.draft.span}
-						<div class="text-amber flex items-center gap-2 text-xs">
-							Trimmed to {formatSpan(session.draft.span)} (recorded with the label; the item itself is unchanged)
-							<button type="button" tabindex="-1" class="btn btn-ghost btn-xs" onclick={() => session.resetTrim()}>Reset</button>
-						</div>
-					{/if}
+					<div class="flex flex-col gap-2 px-4">
+						<Timeline
+							asset={detail.asset}
+							{media}
+							{itemSpan}
+							trimmed={session.draft.span}
+							playhead={session.playhead}
+							frameRate={session.frameRate()}
+							tracks={session.tracks}
+							pending={session.pendingRange}
+							itemStart={session.itemStart}
+							length={session.length}
+							selected={session.selectedRange}
+							looped={session.loopedRange}
+							onseek={(seconds) => session.seekTo(seconds)}
+							onselect={(range) => session.selectRange(range)}
+							onloop={(range) => session.toggleLoop(range)}
+							oncreate={(target, first, second) => session.createRange(target, first, second)}
+							onchange={(previous, next) => session.replaceRange(previous, next)}
+							onaccept={(ghost) => session.acceptSuggestedRange(ghost)}
+							onarm={(target) => session.armLabel(target)}
+							selectedRefinements={session.selectedRefinements}
+							onrefine={(target) => session.refineSelected(target)}
+							onhover={setPreview}
+							onscrub={() => session.pause()}
+							ondelete={(range) => session.deleteRange(range)}
+						/>
+						{#if session.loopedRange}
+							<div class="text-amber flex items-center gap-2 text-xs">
+								Looping {session.loopedRange.group}.{session.loopedRange.label} only
+								<button type="button" tabindex="-1" class="btn btn-ghost btn-xs" onclick={() => session.cancelRange()}>Back to the whole item <kbd class="ml-1 font-mono text-[10px] opacity-60">Esc</kbd></button>
+							</div>
+						{/if}
+						{#if session.draft.span}
+							<div class="text-amber flex items-center gap-2 text-xs">
+								Trimmed to {formatSpan(session.draft.span)} (recorded with the label; the item itself is unchanged)
+								<button type="button" tabindex="-1" class="btn btn-ghost btn-xs" onclick={() => session.resetTrim()}>Reset</button>
+							</div>
+						{/if}
+					</div>
 				{/if}
-				<MetaDetails {detail} />
+				<div class="px-4"><MetaDetails {detail} /></div>
+				<KeyLegend />
 			</div>
 
-			<aside class="flex w-[26rem] shrink-0 flex-col gap-2">
-				<div class="min-h-0 flex-1 overflow-y-auto pr-1">
+			<aside class="border-line bg-canvas flex w-[26rem] shrink-0 flex-col border-l">
+				<div class="min-h-0 flex-1 overflow-y-auto">
 					<GroupsPanel {session} />
 				</div>
 
-				{#if problemLines.length}
-					<div class="alert alert-error flex-col items-start gap-0.5 text-xs">
-						{#each problemLines as problem (problem)}<span>{problem}</span>{/each}
-					</div>
-				{/if}
-				{#if session.notice}
-					<div class="text-amber px-1 text-xs">{session.notice}</div>
-				{/if}
+				<div class="border-line flex flex-col gap-2 border-t p-3">
+					{#if problemLines.length}
+						<div class="alert alert-error flex-col items-start gap-0.5 text-xs">
+							{#each problemLines as problem (problem)}<span>{problem}</span>{/each}
+						</div>
+					{/if}
+					{#if session.notice}
+						<div class="text-amber px-1 text-xs">{session.notice}</div>
+					{/if}
 
-				<div class="flex gap-2">
-					<button type="button" tabindex="-1" class="btn flex-1" disabled={session.saving} onmousedown={(event) => event.preventDefault()} onclick={() => void session.save('skipped')}>
-						Skip <kbd class="ml-1 font-mono text-[10px] opacity-60">S</kbd>
-					</button>
-					<button type="button" tabindex="-1" class="btn btn-primary flex-[2]" disabled={session.saving || session.problems.length > 0} onmousedown={(event) => event.preventDefault()} onclick={() => void session.save('labeled')}>
-						Save and next <kbd class="ml-1 font-mono text-[10px] opacity-60">Enter</kbd>
-					</button>
+					<div class="flex gap-2">
+						<button type="button" tabindex="-1" class="btn flex-1" disabled={session.saving} onmousedown={(event) => event.preventDefault()} onclick={() => void session.save('skipped')}>
+							Skip <kbd class="ml-1 font-mono text-[10px] opacity-60">S</kbd>
+						</button>
+						<button type="button" tabindex="-1" class="btn btn-primary flex-[2]" disabled={session.saving || session.problems.length > 0} onmousedown={(event) => event.preventDefault()} onclick={() => void session.save('labeled')}>
+							Save and next <kbd class="ml-1 font-mono text-[10px] opacity-60">Enter</kbd>
+						</button>
+					</div>
 				</div>
 			</aside>
 		</div>
-
-		<KeyLegend />
 	</div>
 {/if}
 

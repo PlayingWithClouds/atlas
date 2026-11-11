@@ -32,16 +32,18 @@
 	/>
 {/snippet}
 
-<div class="flex flex-col gap-1.5">
-	{#if session.suggestion}
-		<div class="text-dim flex items-center gap-2 px-1 pb-1 text-xs">
+<div class="flex flex-col">
+	<div class="border-line bg-canvas text-dim sticky top-0 z-10 flex h-10 items-center gap-2 border-b px-3 text-xs">
+		{#if session.suggestion}
 			<SparkleIcon size={13} class="text-green" />
 			<span class="flex-1">Proposals from <span class="font-mono">{session.suggestion.source}</span></span>
 			<button type="button" tabindex="-1" class="btn btn-xs btn-ghost" disabled={!session.acceptable} onmousedown={(event) => event.preventDefault()} onclick={() => session.acceptSuggestions()}>
 				Accept <span class="font-mono opacity-50">A</span>
 			</button>
-		</div>
-	{/if}
+		{:else}
+			<span class="flex-1">No proposals for this item yet</span>
+		{/if}
+	</div>
 
 	{#each session.layout.primary as group (group.id)}
 		{@render card(group)}
@@ -53,7 +55,7 @@
 			tabindex="-1"
 			onmousedown={(event) => event.preventDefault()}
 			onclick={() => session.toggleMore()}
-			class="text-dim hover:text-default mt-1 flex items-center gap-1.5 px-1 py-1 text-left text-xs font-medium"
+			class="text-dim hover:text-default border-line-faint flex items-center gap-1.5 border-b px-3 py-2 text-left text-xs font-medium"
 			title="Groups behind More count as reviewed while open, unknown while closed (G)"
 		>
 			{#if session.draft.moreExpanded}<CaretDownIcon size={12} />{:else}<CaretRightIcon size={12} />{/if}

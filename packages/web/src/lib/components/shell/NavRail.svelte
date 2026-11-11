@@ -19,7 +19,7 @@
 	}
 </script>
 
-<aside class="border-line-faint bg-elevated flex h-full w-60 shrink-0 flex-col rounded-xl border shadow-md">
+<aside class="border-line-faint bg-canvas flex h-full w-60 shrink-0 flex-col border-r">
 	<ProjectSwitcher {projectId} />
 
 	<button

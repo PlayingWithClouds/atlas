@@ -36,6 +36,48 @@ export function probabilityOf(suggestion: Suggestion | undefined, groupId: strin
   return group[labelId];
 }
 
+/**
+ * How unsure the suggestion is about one group, 0 (sure) to 1 (no idea); undefined without
+ * probabilities for it. Single groups: entropy over the labels, normalized by its maximum.
+ * Multi groups: the label closest to 0.5 decides; a mean would hide one coin-flip label among
+ * many confident zeros.
+ */
+export function uncertaintyOf(suggestion: Suggestion | undefined, group: Group): number | undefined {
+  if (suggestion === undefined || suggestion.values === undefined) {
+    return undefined;
+  }
+  const probabilities = suggestion.values[group.id];
+  if (probabilities === undefined) {
+    return undefined;
+  }
+  const values = Object.values(probabilities);
+  if (values.length === 0) {
+    return undefined;
+  }
+  if (group.kind === "single" && values.length === 1) {
+    return 0;
+  }
+  if (group.kind === "single") {
+    return normalizedEntropy(values);
+  }
+  return Math.max(...values.map((probability) => 1 - Math.abs(2 * probability - 1)));
+}
+
+function normalizedEntropy(probabilities: number[]): number {
+  const total = probabilities.reduce((sum, probability) => sum + probability, 0);
+  if (total <= 0) {
+    return 1;
+  }
+  let entropy = 0;
+  for (const probability of probabilities) {
+    const share = probability / total;
+    if (share > 0) {
+      entropy -= share * Math.log(share);
+    }
+  }
+  return entropy / Math.log(probabilities.length);
+}
+
 function proposedLabelIds(group: Group, suggestion: Suggestion, threshold: number): string[] {
   const candidates = group.labels
     .filter((label) => label.deprecated !== true)

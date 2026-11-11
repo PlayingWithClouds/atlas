@@ -9,7 +9,8 @@
 	import type { Draft } from './draft';
 	import { hasLabels, valuesOfGroup } from './draft';
 	import LabelGrid from './LabelGrid.svelte';
-	import { ACCEPT_THRESHOLD, probabilityOf } from './suggestions';
+	import { ACCEPT_THRESHOLD, probabilityOf, uncertaintyOf } from './suggestions';
+	import UncertaintyMeter from './UncertaintyMeter.svelte';
 
 	let {
 		group,
@@ -37,6 +38,7 @@
 	const expanded = $derived(focusedGroupId === group.id || refinements.some((refinement) => refinement.id === focusedGroupId));
 	const holdsLabels = $derived(hasLabels(draft, group.id));
 	const reviewed = $derived(holdsLabels || !draft.notReviewed.includes(group.id));
+	const uncertainty = $derived(uncertaintyOf(suggestion, group));
 
 	interface SummaryEntry {
 		id: string;
@@ -111,7 +113,7 @@
 	});
 </script>
 
-<section bind:this={element} aria-label={group.label} class="rounded-lg border transition-colors {expanded ? 'border-line-strong bg-surface' : 'border-line-faint hover:border-line'}">
+<section bind:this={element} aria-label={group.label} class="border-line-faint border-b transition-colors {expanded ? 'bg-surface' : 'hover:bg-hover/40'}">
 	<button
 		type="button"
 		tabindex="-1"
@@ -125,7 +127,7 @@
 		</span>
 		<span class="text-default shrink-0 text-sm font-semibold">{group.label}</span>
 		{#if expanded}
-			<span class="text-faint text-[11px]">{kindHint(group)}</span>
+			<span class="text-faint flex-1 text-[11px]">{kindHint(group)}</span>
 		{:else}
 			<span class="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
 				{#each summary as entry (entry.id)}
@@ -141,6 +143,7 @@
 				{/if}
 			</span>
 		{/if}
+		{#if uncertainty !== undefined}<UncertaintyMeter {uncertainty} />{/if}
 	</button>
 
 	{#if expanded}
@@ -149,12 +152,14 @@
 
 			{#each refinements as refinement (refinement.id)}
 				{@const focusedHere = focusedGroupId === refinement.id}
+				{@const refinementUncertainty = uncertaintyOf(suggestion, refinement)}
 				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 				<div class="border-violet/60 rounded-r-md border-l-2 py-1.5 pr-1 pl-3 {focusedHere ? 'bg-violet/10' : ''}" onclick={() => onfocus(refinement.id)}>
 					<div class="mb-1.5 flex items-center gap-2 text-xs">
 						<span class="text-violet">↳ {parentLabelName(refinement)}</span>
 						<span class="font-semibold {focusedHere ? 'text-default' : 'text-muted'}">{refinement.label}</span>
-						<span class="text-faint text-[11px]">{kindHint(refinement)}</span>
+						<span class="text-faint flex-1 text-[11px]">{kindHint(refinement)}</span>
+					{#if refinementUncertainty !== undefined}<UncertaintyMeter uncertainty={refinementUncertainty} />{/if}
 					</div>
 					<LabelGrid group={refinement} {draft} {suggestion} columns={columnsFor(refinement)} ontoggle={(labelId) => ontoggle(refinement, labelId)} />
 				</div>

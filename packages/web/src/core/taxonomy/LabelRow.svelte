@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { Label } from '@atlas/contracts';
 	import { uniqueId } from './taxonomyEdit';
+	import CaretDownIcon from 'phosphor-svelte/lib/CaretDown';
+	import CaretUpIcon from 'phosphor-svelte/lib/CaretUp';
 	import TrashIcon from 'phosphor-svelte/lib/Trash';
 
 	let {
@@ -11,6 +13,8 @@
 	}: { label: Label; saved: boolean; siblingIds: string[]; onremove: () => void } = $props();
 
 	let idEdited = $state(false);
+	/** Shows the rarely edited fields: id, example image, deprecated or remove. */
+	let open = $state(false);
 
 	// A new label's id follows its name until the person edits the id themselves.
 	function onNameInput() {
@@ -45,26 +49,40 @@
 	}
 </script>
 
-<div class="border-line grid grid-cols-[1.2fr_1fr_56px_1.4fr_1.4fr_auto] items-center gap-2 border-t py-2 {label.deprecated ? 'opacity-50' : ''}">
-	<input class="input input-sm" placeholder="Name" bind:value={label.name} oninput={onNameInput} />
-	<input
-		class="input input-sm font-mono"
-		placeholder="id"
-		bind:value={label.id}
-		readonly={saved}
-		oninput={() => (idEdited = true)}
-		title={saved ? 'Saved ids never change' : 'Stable id used in annotations'}
-	/>
-	<input class="input input-sm text-center font-mono" placeholder="key" maxlength="1" value={label.hotkey} oninput={onHotkeyInput} title="Hotkey" />
-	<input class="input input-sm" placeholder="Example image URL" value={label.image} oninput={(event) => onOptionalInput('image', event.currentTarget.value)} />
-	<input class="input input-sm" placeholder="Description" value={label.description} oninput={(event) => onOptionalInput('description', event.currentTarget.value)} />
-	<div class="flex items-center gap-1">
-		{#if saved}
-			<label class="text-dim flex items-center gap-1.5 text-xs" title="Kept for old annotations, no longer offered">
-				<input type="checkbox" checked={label.deprecated === true} onchange={(event) => setDeprecated(event.currentTarget.checked)} /> deprecated
-			</label>
+<div class="border-line-faint border-b {label.deprecated ? 'opacity-50' : ''}">
+	<div class="grid grid-cols-[2.5rem_minmax(8rem,1fr)_2fr_1.75rem_1.75rem] items-center gap-1 py-0.5">
+		<input class="input input-sm input-ghost text-center font-mono" placeholder="·" maxlength="1" value={label.hotkey} oninput={onHotkeyInput} title="Hotkey" />
+		<input class="input input-sm input-ghost text-default font-medium" placeholder="Name" bind:value={label.name} oninput={onNameInput} />
+		<input class="input input-sm input-ghost text-muted" placeholder="Add a description" value={label.description} oninput={(event) => onOptionalInput('description', event.currentTarget.value)} />
+		{#if label.image}
+			<img src={label.image} alt="" loading="lazy" class="h-6 w-6 rounded object-cover" title="Example image" />
 		{:else}
-			<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={onremove} aria-label="Remove label"><TrashIcon size={13} /></button>
+			<span></span>
 		{/if}
+		<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={() => (open = !open)} aria-label="More fields" aria-expanded={open}>
+			{#if open}<CaretUpIcon size={12} />{:else}<CaretDownIcon size={12} />{/if}
+		</button>
 	</div>
+
+	{#if open}
+		<div class="grid grid-cols-[2.5rem_minmax(8rem,1fr)_2fr_auto] items-center gap-1 pb-2">
+			<span></span>
+			<input
+				class="input input-sm font-mono"
+				placeholder="id"
+				bind:value={label.id}
+				readonly={saved}
+				oninput={() => (idEdited = true)}
+				title={saved ? 'Saved ids never change' : 'Stable id used in annotations'}
+			/>
+			<input class="input input-sm" placeholder="Example image URL" value={label.image} oninput={(event) => onOptionalInput('image', event.currentTarget.value)} />
+			{#if saved}
+				<label class="text-dim flex items-center gap-1.5 px-1 text-xs" title="Kept for old annotations, no longer offered">
+					<input type="checkbox" checked={label.deprecated === true} onchange={(event) => setDeprecated(event.currentTarget.checked)} /> deprecated
+				</label>
+			{:else}
+				<button type="button" class="btn btn-ghost btn-xs" onclick={onremove}><TrashIcon size={13} /> Remove</button>
+			{/if}
+		</div>
+	{/if}
 </div>
