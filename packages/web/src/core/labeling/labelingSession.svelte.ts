@@ -242,6 +242,10 @@ export class LabelingSession {
 
   /** A new video loads itself paused at its span start; the same video just jumps to the new scene, paused. */
   private restartPlayback(sameAsset: boolean): void {
+    // The timeline shows the scene start at once, not 0 until the player reports in.
+    if (this.playSpan !== undefined) {
+      this.playhead = this.playSpan.start;
+    }
     if (!sameAsset || this.handle === undefined || this.playSpan === undefined) {
       return;
     }

@@ -16,6 +16,9 @@ export interface SpanLoopOptions {
  * Loads the source into the video and keeps playback inside the span: seeks to its start when the
  * metadata is in, and jumps back from its end on every frame (timeupdate is too coarse).
  */
+/** How far from the span start a freshly loaded video may sit before it is moved there. */
+const START_TOLERANCE_SECONDS = 0.25;
+
 export class SpanLoop {
   roaming = false;
   private frame = 0;
@@ -64,6 +67,23 @@ export class SpanLoop {
       return;
     }
     video.currentTime = this.windowStart();
+    this.report();
+  }
+
+  /**
+   * First decoded frame: some streams (HLS, slow seeks) settle at 0 instead of the requested
+   * start; pull the playhead back to the span start unless the person already moved it.
+   */
+  onLoadedData(): void {
+    const video = this.options.video();
+    if (video === undefined || this.roaming || !video.paused) {
+      return;
+    }
+    const start = this.windowStart();
+    if (Math.abs(video.currentTime - start) > START_TOLERANCE_SECONDS) {
+      video.currentTime = start;
+    }
+    this.report();
   }
 
   /** Pulls the playhead into a changed span (a new item, a trim) unless the person went outside on purpose. */

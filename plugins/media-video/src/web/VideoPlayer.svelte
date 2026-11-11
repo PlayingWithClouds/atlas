@@ -194,6 +194,7 @@
 		disablepictureinpicture
 		poster={posterUrl()}
 		onloadedmetadata={onMetadata}
+		onloadeddata={() => loop.onLoadedData()}
 		onplay={() => {
 			paused = false;
 			loop.start();
