@@ -170,28 +170,34 @@ export interface KeyHelp {
   action: string;
   /** Shown in the compact legend under the screen; the cheat sheet lists everything. */
   compact: boolean;
+  /** One word for the compact legend. */
+  short?: string;
 }
 
 export const KEY_HELP: KeyHelp[] = [
-  { keys: ["↑", "↓"], action: "Focus group (also Tab)", compact: true },
-  { keys: ["1-9"], action: "Toggle label of the focused group", compact: true },
+  { keys: ["↑", "↓"], action: "Focus group (also Tab)", compact: true, short: "group" },
+  { keys: ["1-9"], action: "Toggle label of the focused group", compact: false },
   { keys: ["hotkey"], action: "Toggle the label with that hotkey", compact: false },
-  { keys: ["Space"], action: "Play / pause", compact: true },
-  { keys: ["←", "→"], action: "Seek 2 s", compact: true },
-  { keys: [",", "."], action: "One frame back / forward", compact: true },
+  { keys: ["Space"], action: "Play / pause", compact: true, short: "play" },
+  { keys: ["←", "→"], action: "Seek 2 s", compact: true, short: "2 s" },
+  { keys: [",", "."], action: "One frame back / forward", compact: true, short: "frame" },
   { keys: ["Shift", ", ."], action: "Ten frames back / forward", compact: false },
-  { keys: ["Enter"], action: "Save and open the next item", compact: true },
-  { keys: ["S"], action: "Skip the item", compact: true },
-  { keys: ["A"], action: "Accept suggestions of 50 % or more", compact: true },
-  { keys: ["C"], action: "Copy labels from the previous scene of this video", compact: true },
+  { keys: ["Enter"], action: "Save and open the next item", compact: true, short: "save" },
+  { keys: ["S"], action: "Skip the item", compact: true, short: "skip" },
+  { keys: ["A"], action: "Accept suggestions of 50 % or more", compact: true, short: "accept" },
+  { keys: ["C"], action: "Copy labels from the previous scene of this video", compact: false },
   { keys: ["Backspace"], action: "Delete the selected range, else clear the focused group", compact: false },
-  { keys: ["["], action: "Selected range (else the item) starts at the playhead", compact: true },
-  { keys: ["]"], action: "Selected range (else the item) ends at the playhead", compact: true },
-  { keys: ["R"], action: "Start / end a range for the focused label", compact: true },
+  { keys: ["["], action: "Selected range (else the item) starts at the playhead", compact: false },
+  { keys: ["]"], action: "Selected range (else the item) ends at the playhead", compact: false },
+  { keys: ["R"], action: "Start / end a range for the focused label", compact: false },
   { keys: ["Esc"], action: "Deselect the range, stop looping it", compact: false },
+  { keys: ["drag"], action: "In a timeline track: mark the part of the item a label holds for", compact: false },
+  { keys: ["drag"], action: "A bar or its edges: move or resize it (snaps to the playhead)", compact: false },
+  { keys: ["dbl-click"], action: "A bar: loop just that part", compact: false },
+  { keys: ["wheel"], action: "Over the timeline: zoom (Shift: scroll sideways)", compact: false },
   { keys: ["U"], action: "Mark the focused group (not) reviewed", compact: false },
   { keys: ["G"], action: "Show / hide More groups", compact: false },
   { keys: ["M"], action: "Mute / unmute", compact: false },
   { keys: ["Shift", "←/→"], action: "Previous / next scene of this video", compact: false },
-  { keys: ["?"], action: "This cheat sheet", compact: true },
+  { keys: ["?"], action: "This cheat sheet", compact: true, short: "all keys" },
 ];

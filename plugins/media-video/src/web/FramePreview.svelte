@@ -26,7 +26,7 @@
 	}
 
 	function paint(request: number, still: Still | undefined): boolean {
-		if (request !== latest || canvas === undefined || still === undefined) {
+		if (request !== latest || !(canvas instanceof HTMLCanvasElement) || still === undefined) {
 			return false;
 		}
 		paintStill(canvas, still);

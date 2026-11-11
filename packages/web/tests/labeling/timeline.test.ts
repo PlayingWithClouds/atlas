@@ -118,6 +118,25 @@ describe('label tracks', () => {
     expect(activity.id).toBe('activity');
   });
 
+  test('refinement tracks follow their parent; exact matches show inside the parent bar', () => {
+    const parent = { group: 'position', label: 'standing', start: 0, end: 4 };
+    const tracks = labelTracks({
+      groups: taxonomy.groups,
+      values: { activity: ['talking'] },
+      ranges: [parent, { group: 'pose', label: 'arms-up', start: 0, end: 4 }, { group: 'pose', label: 'arms-down', start: 1, end: 2 }],
+      suggested: [],
+    });
+    expect(tracks.map((track) => track.label.id)).toEqual(['standing', 'arms-down', 'talking']);
+    expect(tracks[0].rangeNotes).toEqual(['Arms up']);
+    expect(tracks[1].refines).toEqual({ group: 'position', label: 'standing' });
+  });
+
+  test('a whole-item refinement is noted on the parent', () => {
+    const tracks = labelTracks({ groups: taxonomy.groups, values: { position: ['standing'], pose: ['arms-up'] }, ranges: [], suggested: [] });
+    expect(tracks.map((track) => track.label.id)).toEqual(['standing']);
+    expect(tracks[0].wholeNote).toBe('Arms up');
+  });
+
   test('a range of the condition label opens the conditional group', () => {
     const tracks = labelTracks({
       groups: taxonomy.groups,

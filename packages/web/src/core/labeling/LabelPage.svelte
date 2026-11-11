@@ -137,6 +137,9 @@
 						onchange={(previous, next) => session.replaceRange(previous, next)}
 						onaccept={(ghost) => session.acceptSuggestedRange(ghost)}
 						onarm={(target) => session.armLabel(target)}
+						selectedRefinements={session.selectedRefinements}
+						onrefine={(target) => session.refineSelected(target)}
+						ondelete={(range) => session.deleteRange(range)}
 					/>
 					{#if session.loopedRange}
 						<div class="text-amber flex items-center gap-2 text-xs">

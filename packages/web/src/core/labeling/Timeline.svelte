@@ -3,11 +3,13 @@
 	// label that is on, suggested as a range, or armed. Dragging in a track draws a range; bars move
 	// and resize by dragging, select on click, loop on double-click. Times on screen are asset seconds;
 	// ranges are stored item-relative.
-	import type { Asset, Range, Span } from '@atlas/contracts';
+	import type { Asset, Group, Range, Span } from '@atlas/contracts';
 	import type { MediaPlayerContribution } from '@atlas/contracts/web';
 	import MagnifyingGlassMinusIcon from 'phosphor-svelte/lib/MagnifyingGlassMinus';
 	import MagnifyingGlassPlusIcon from 'phosphor-svelte/lib/MagnifyingGlassPlus';
 	import ArrowsOutLineHorizontalIcon from 'phosphor-svelte/lib/ArrowsOutLineHorizontal';
+	import RepeatIcon from 'phosphor-svelte/lib/Repeat';
+	import TrashIcon from 'phosphor-svelte/lib/Trash';
 	import type { PendingRange, RangeTarget } from './ranges';
 	import type { LabelTrack, RangeDragMode, SuggestedRange, TimelineWindow } from './timeline';
 	import { draggedRange, pageTo, panWindow, percentAt, secondsAtFraction, snapTime, tickStep, ticksOf, timelineWindow, zoomWindow } from './timeline';
@@ -32,7 +34,10 @@
 		oncreate,
 		onchange,
 		onaccept,
-		onarm
+		onarm,
+		selectedRefinements,
+		onrefine,
+		ondelete
 	}: {
 		asset: Asset;
 		media: MediaPlayerContribution | undefined;
@@ -56,6 +61,10 @@
 		onchange: (previous: Range, next: Range) => void;
 		onaccept: (ghost: SuggestedRange) => void;
 		onarm: (target: RangeTarget) => void;
+		/** Refinement groups of the selected range's label, with the labels set for exactly its span. */
+		selectedRefinements: { group: Group; chosen: string[]; wholeItem: string[] }[];
+		onrefine: (target: RangeTarget) => void;
+		ondelete: (range: Range) => void;
 	} = $props();
 
 	const PREVIEW_WIDTH = 384;
@@ -372,6 +381,21 @@
 		return classes.join(' ');
 	}
 
+	function refinementTitle(name: string, wholeItem: boolean): string {
+		if (wholeItem) {
+			return `${name} is set for the whole item (in the panel)`;
+		}
+		return `Set ${name} for exactly this part`;
+	}
+
+	function selectedName(range: Range): string {
+		const track = tracks.find((candidate) => candidate.group.id === range.group && candidate.label.id === range.label);
+		if (track === undefined) {
+			return range.label;
+		}
+		return track.label.name;
+	}
+
 	function trackTitle(track: LabelTrack): string {
 		if (track.whole) {
 			return `${track.group.label}: ${track.label.name}, whole item. Drag in the track to limit it to a range.`;
@@ -449,18 +473,22 @@
 				title={trackTitle(track)}
 				class="flex min-w-0 items-center justify-end gap-1 text-right text-[11px] leading-tight {track.armed ? 'text-default' : 'text-dim hover:text-muted'}"
 			>
-				<span class="text-faint truncate">{track.group.label}</span>
+				{#if track.refines}
+					<span class="text-violet">↳</span>
+				{:else}
+					<span class="text-faint truncate">{track.group.label}</span>
+				{/if}
 				<span class="truncate font-medium">{track.label.name}</span>
 				{#if track.armed}<span class="bg-violet h-1.5 w-1.5 shrink-0 rounded-full" title="Armed: R and dragging use this label"></span>{/if}
 			</button>
 			<div
 				role="presentation"
 				onpointerdown={(event) => startCreate(event, track)}
-				class="bg-surface relative h-6 cursor-crosshair rounded {track.armed ? 'ring-violet/50 ring-1' : ''}"
+				class="bg-surface relative cursor-crosshair rounded {track.refines ? 'h-5' : 'h-6'} {track.armed ? 'ring-violet/50 ring-1' : ''}"
 				title={trackTitle(track)}
 			>
 				{#if track.whole}
-					<div class="bg-violet/20 border-violet/40 pointer-events-none absolute inset-y-0.5 rounded-sm border border-dashed px-1 text-[10px] leading-[1.1rem] text-white/70" style="left: {left(wholeSpan().start)}%; width: {widthBetween(wholeSpan().start, wholeSpan().end)}%">whole item</div>
+					<div class="bg-violet/20 border-violet/40 pointer-events-none absolute inset-y-0.5 flex items-center rounded-sm border border-dashed px-1 text-[10px] whitespace-nowrap text-white/70" style="left: {left(wholeSpan().start)}%; width: {widthBetween(wholeSpan().start, wholeSpan().end)}%">whole item{#if track.wholeNote}<span class="text-default font-medium">&nbsp;· {track.wholeNote}</span>{/if}</div>
 				{/if}
 
 				{#each track.ghosts as ghost (ghost)}
@@ -478,8 +506,9 @@
 					</button>
 				{/each}
 
-				{#each track.ranges as range (range)}
+				{#each track.ranges as range, index (range)}
 					{@const shown = shownRange(range)}
+					{@const note = track.rangeNotes[index]}
 					<div
 						role="button"
 						tabindex="-1"
@@ -489,7 +518,10 @@
 						class="absolute inset-y-0 cursor-grab overflow-hidden rounded-sm {barClass(range)}"
 						style="left: {left(itemStart + shown.start)}%; width: {widthBetween(itemStart + shown.start, itemStart + shown.end)}%"
 					>
-						<span class="pointer-events-none px-1.5 text-[10px] leading-6 whitespace-nowrap text-white">{formatClock(shown.end - shown.start, 1)}</span>
+						<span class="pointer-events-none flex h-full items-center gap-1 px-1.5 text-[10px] whitespace-nowrap text-white">
+							{#if note}<span class="font-semibold">{note}</span>{/if}
+							<span class="opacity-70">{formatClock(shown.end - shown.start, 1)}</span>
+						</span>
 						<div role="presentation" class="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize bg-white/0 hover:bg-white/50" onpointerdown={(event) => startEdit(event, range, 'start')}></div>
 						<div role="presentation" class="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize bg-white/0 hover:bg-white/50" onpointerdown={(event) => startEdit(event, range, 'end')}></div>
 					</div>
@@ -524,8 +556,37 @@
 			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" onmousedown={(event) => event.preventDefault()} onclick={() => zoomBy(1 / 1.6)} title="Zoom in around the playhead (wheel)"><MagnifyingGlassPlusIcon size={14} /></button>
 			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" disabled={!zoomed} onmousedown={(event) => event.preventDefault()} onclick={fit} title="Fit the item"><ArrowsOutLineHorizontalIcon size={14} /></button>
 		</div>
-		<span>
-			Drag in a track to mark a range · drag bars and edges (they snap to the playhead) · double-click loops a range · <kbd>,</kbd> <kbd>.</kbd> step a frame · wheel zooms, Shift+wheel pans
-		</span>
+		{#if selected}
+			<div class="flex min-w-0 flex-wrap items-center gap-1.5">
+				<span class="text-default font-medium">{selectedName(selected)}</span>
+				<span class="font-mono tabular-nums">{formatClock(itemStart + selected.start, 2)}–{formatClock(itemStart + selected.end, 2)}</span>
+				{#each selectedRefinements as refinement (refinement.group.id)}
+					<span class="bg-line mx-1 h-3 w-px"></span>
+					<span>{refinement.group.label}:</span>
+					{#each refinement.group.labels.filter((label) => label.deprecated !== true) as label (label.id)}
+						<button
+							type="button"
+							tabindex="-1"
+							onmousedown={(event) => event.preventDefault()}
+							onclick={() => onrefine({ group: refinement.group.id, label: label.id })}
+							disabled={refinement.wholeItem.includes(label.id)}
+							class="btn btn-xs {refinement.chosen.includes(label.id) || refinement.wholeItem.includes(label.id) ? 'btn-primary' : 'btn-ghost border-line'}"
+							title={refinementTitle(label.name, refinement.wholeItem.includes(label.id))}
+						>
+							{label.name}
+						</button>
+					{/each}
+				{/each}
+				<span class="bg-line mx-1 h-3 w-px"></span>
+				<button type="button" tabindex="-1" class="btn btn-ghost btn-xs" onmousedown={(event) => event.preventDefault()} onclick={() => onloop(selected)} title="Loop just this part (double-click)">
+					<RepeatIcon size={12} />{#if selected === looped}Stop loop{:else}Loop{/if}
+				</button>
+				<button type="button" tabindex="-1" class="btn btn-ghost btn-xs" onmousedown={(event) => event.preventDefault()} onclick={() => ondelete(selected)} title="Delete this part (Backspace)">
+					<TrashIcon size={12} />Delete
+				</button>
+			</div>
+		{:else}
+			<span class="truncate">Drag in a track to mark where a label holds · click a bar to edit it · <span class="font-mono">?</span> for all keys</span>
+		{/if}
 	</div>
 </div>
