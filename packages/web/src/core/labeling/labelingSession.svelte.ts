@@ -38,6 +38,9 @@ function isRepeatable(action: LabelAction): boolean {
 }
 
 /** Everything the labeling screen knows and can do for one item at a time. */
+/** S asks the adapter live; past this it falls back to the pushed suggestions. */
+const LIVE_TIMEOUT_MS = 3000;
+
 function tookMessage(count: number): string {
   if (count === 0) {
     return 'No suggested section at the playhead';
@@ -538,14 +541,21 @@ export class LabelingSession {
     }
   }
 
-  /** S: suggested sections under the playhead become ranges from here to where they end. */
-  acceptSuggestionsHere(): void {
-    const suggested = this.suggestion?.ranges;
-    if (suggested === undefined || suggested.length === 0) {
+  /**
+   * S: the labels on at the playhead become ranges from here to where they end. The project's
+   * live endpoint is asked for this exact moment; without one (or when it does not answer) the
+   * pushed suggestions' ranges are used.
+   */
+  async acceptSuggestionsHere(): Promise<void> {
+    const time = itemTimeOf(this.currentTime(), this.itemStart, this.length);
+    let suggested = await this.liveRangesAt(time);
+    if (suggested === undefined) {
+      suggested = this.storedSuggestedRanges();
+    }
+    if (suggested.length === 0) {
       this.say('No suggested sections for this item');
       return;
     }
-    const time = itemTimeOf(this.currentTime(), this.itemStart, this.length);
     const taken = rangesFromHere(suggested, this.draft.ranges, time, MIN_RANGE_SECONDS);
     let added = 0;
     for (const range of taken) {
@@ -559,6 +569,36 @@ export class LabelingSession {
       added += 1;
     }
     this.say(tookMessage(added));
+  }
+
+  private storedSuggestedRanges(): SuggestedRange[] {
+    if (this.suggestion === undefined || this.suggestion.ranges === undefined) {
+      return [];
+    }
+    return this.suggestion.ranges;
+  }
+
+  /** Ranges the adapter predicts from `time` on, or undefined when there is no live endpoint or it fails. */
+  private async liveRangesAt(time: number): Promise<SuggestedRange[] | undefined> {
+    const url = this.project?.liveSuggestions;
+    if (url === undefined || this.item === undefined) {
+      return undefined;
+    }
+    const query = new URLSearchParams({ item: this.item.id, at: time.toFixed(3) });
+    try {
+      const response = await fetch(`${url}?${query}`, { signal: AbortSignal.timeout(LIVE_TIMEOUT_MS) });
+      if (!response.ok) {
+        return undefined;
+      }
+      const body = (await response.json()) as { ranges?: SuggestedRange[] };
+      if (!Array.isArray(body.ranges)) {
+        return undefined;
+      }
+      // `at` went out rounded; ranges that start there must still count as under the playhead.
+      return body.ranges.map((range) => ({ ...range, start: Math.min(range.start, time) }));
+    } catch {
+      return undefined;
+    }
   }
 
   /** Shift+F: the open labels hold for the whole item instead of a range. */
@@ -763,7 +803,7 @@ export class LabelingSession {
       escape: () => this.cancelRange(),
       search: () => (this.searchOpen = true),
       wholeItem: () => this.wholeItem(),
-      acceptHere: () => this.acceptSuggestionsHere(),
+      acceptHere: () => void this.acceptSuggestionsHere(),
     };
     simple[action.kind]?.();
     this.performWithArgument(action);

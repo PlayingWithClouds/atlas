@@ -54,6 +54,14 @@ describe("projects", () => {
     expect(cleared.body.prefillSource).toBeUndefined();
     expect((await api.patch("/api/projects/p", { prefillSource: 5 })).status).toBe(422);
   });
+
+  test("patch sets the live suggestions URL, null clears it", async () => {
+    await api.post("/api/projects", { id: "p", name: "P" });
+    const set = await api.patch("/api/projects/p", { liveSuggestions: "http://localhost:8124/live" });
+    expect(set.body.liveSuggestions).toBe("http://localhost:8124/live");
+    expect((await api.patch("/api/projects/p", { liveSuggestions: null })).body.liveSuggestions).toBeUndefined();
+    expect((await api.patch("/api/projects/p", { liveSuggestions: "ftp://x" })).status).toBe(422);
+  });
 });
 
 describe("taxonomy", () => {

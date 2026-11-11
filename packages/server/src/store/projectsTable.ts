@@ -7,6 +7,7 @@ interface ProjectRow {
   taxonomy_groups: string;
   taxonomy_version: number;
   prefill_source: string | null;
+  live_suggestions: string | null;
 }
 
 interface SummaryRow {
@@ -48,6 +49,9 @@ function projectOf(row: ProjectRow): Project {
   if (row.prefill_source !== null) {
     project.prefillSource = row.prefill_source;
   }
+  if (row.live_suggestions !== null) {
+    project.liveSuggestions = row.live_suggestions;
+  }
   return project;
 }
 
@@ -80,6 +84,10 @@ export class ProjectsTable {
 
   setPrefillSource(projectId: string, prefillSource: string | null): void {
     this.database.query("UPDATE projects SET prefill_source = ? WHERE id = ?").run(prefillSource, projectId);
+  }
+
+  setLiveSuggestions(projectId: string, url: string | null): void {
+    this.database.query("UPDATE projects SET live_suggestions = ? WHERE id = ?").run(url, projectId);
   }
 
   replaceTaxonomy(projectId: string, taxonomy: Taxonomy): void {
