@@ -117,6 +117,24 @@ export class Stills {
   }
 }
 
+/**
+ * Draws a still at its own pixel size, so the canvas can be resized by CSS (object-fit) without
+ * repainting: cells of a zooming filmstrip stay sharp and undistorted.
+ */
+export function paintNative(canvas: HTMLCanvasElement, still: Still): void {
+  const width = Math.max(1, Math.round(still.width));
+  const height = Math.max(1, Math.round(still.height));
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  const context = canvas.getContext('2d');
+  if (context === null) {
+    return;
+  }
+  context.drawImage(still.image, still.x, still.y, still.width, still.height, 0, 0, width, height);
+}
+
 /** Draws a still into a canvas, letterboxed, at the canvas's on-screen size; unmounted canvases are skipped. */
 export function paintStill(canvas: HTMLCanvasElement | null | undefined, still: Still): void {
   if (!(canvas instanceof HTMLCanvasElement) || !canvas.isConnected) {
