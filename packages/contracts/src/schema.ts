@@ -231,7 +231,8 @@ export type LiveEvent =
   | { type: "suggestions"; projectId: string; ids: string[] }
   | { type: "annotation"; projectId: string; change: Change }
   | { type: "taxonomy"; projectId: string; taxonomy: Taxonomy }
-  | { type: "projects" };
+  | { type: "projects" }
+  | { type: "settings"; scope: string };
 
 // --- webhooks (server → adapters) --------------------------------------------------------
 
