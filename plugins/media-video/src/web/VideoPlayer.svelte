@@ -141,10 +141,10 @@
 		element?.pause();
 	}
 
+	// No autoplay: the item opens paused on its first frame; Space starts it.
 	function onMetadata(): void {
 		loop.onLoadedMetadata();
 		ready = true;
-		play();
 	}
 
 	onMount(() => onready?.(handle));
