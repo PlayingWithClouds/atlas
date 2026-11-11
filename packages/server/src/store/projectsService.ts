@@ -28,6 +28,16 @@ function readPrefillSource(raw: unknown): string | null | undefined {
   throw new ValidationFailure(["prefillSource must be a string or null"]);
 }
 
+function readLiveSuggestions(raw: unknown): string | null | undefined {
+  if (raw === undefined || raw === null) {
+    return raw;
+  }
+  if (typeof raw === "string" && /^https?:\/\//.test(raw)) {
+    return raw;
+  }
+  throw new ValidationFailure(["liveSuggestions must be an http(s) URL or null"]);
+}
+
 function undefinedIfNull(value: string | null | undefined): string | undefined {
   if (value === null) {
     return undefined;
@@ -94,6 +104,10 @@ export class ProjectsService {
     const prefillSource = readPrefillSource(body.prefillSource);
     if (prefillSource !== undefined) {
       this.table.setPrefillSource(projectId, prefillSource);
+    }
+    const liveSuggestions = readLiveSuggestions(body.liveSuggestions);
+    if (liveSuggestions !== undefined) {
+      this.table.setLiveSuggestions(projectId, liveSuggestions);
     }
     this.events.emit({ type: "projects" });
     return this.require(projectId);

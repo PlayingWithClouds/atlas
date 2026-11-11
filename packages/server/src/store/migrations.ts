@@ -59,4 +59,10 @@ const INITIAL_SCHEMA = `
   CREATE INDEX changes_by_project ON changes (project_id, id);
 `;
 
-export const STORE_MIGRATIONS: Migration[] = [{ version: 1, sql: INITIAL_SCHEMA }];
+/** Where the labeling screen asks an adapter for suggestions at one moment (S). */
+const LIVE_SUGGESTIONS = `ALTER TABLE projects ADD COLUMN live_suggestions TEXT;`;
+
+export const STORE_MIGRATIONS: Migration[] = [
+  { version: 1, sql: INITIAL_SCHEMA },
+  { version: 2, sql: LIVE_SUGGESTIONS },
+];

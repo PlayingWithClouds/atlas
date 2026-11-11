@@ -162,6 +162,12 @@ interface Suggestion {
   are drawn as proposals the person accepts with one key, never as silent defaults.
 - **Queue order.** Pending items are ordered by the highest `priority` across sources, then
   by push order. Items without a priority come last.
+- **Live suggestions.** A project may set `liveSuggestions` to an adapter URL. When the
+  person presses S on a video, the labeling screen asks
+  `GET <url>?item=<item id>&at=<item seconds>` and expects
+  `{ ranges: (Range & { score })[] }`: the labels on at that moment, each running from `at`
+  to where the adapter predicts it ends. The URL must allow the browser (CORS). Without it,
+  or when it does not answer, S uses the pushed suggestions' ranges.
 
 ## HTTP API
 
@@ -181,7 +187,7 @@ All bodies are JSON. Types are in `packages/contracts/src/schema.ts`, rules in
 | GET | `/api/projects` | | `ProjectSummary[]` |
 | POST | `/api/projects` | `ProjectInput` | `Project` |
 | GET | `/api/projects/:project` | | `Project` (with `taxonomy`) |
-| PATCH | `/api/projects/:project` | `{ name?, prefillSource? }` | `Project` |
+| PATCH | `/api/projects/:project` | `{ name?, prefillSource?, liveSuggestions? }` | `Project` |
 | PUT | `/api/projects/:project/taxonomy` | `Taxonomy` | `Taxonomy` (new version) |
 | POST | `/api/projects/:project/assets` | `Asset[]` | batch result |
 | POST | `/api/projects/:project/items` | `Item[]` | batch result |
@@ -200,6 +206,7 @@ interface Project {
   name: string;
   taxonomy: Taxonomy;
   prefillSource?: string;     // suggestion source used to prefill the labeling screen
+  liveSuggestions?: string;   // adapter URL asked for ranges at one moment (S), see below
 }
 
 interface Change {

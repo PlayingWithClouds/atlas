@@ -142,6 +142,11 @@ export interface Project {
   taxonomy: Taxonomy;
   /** Suggestion source used to prefill the labeling screen. */
   prefillSource?: string;
+  /**
+   * URL the labeling screen asks for suggested ranges at one moment (S):
+   * `GET <url>?item=<item id>&at=<item seconds>` → `{ ranges: (Range & { score })[] }`.
+   */
+  liveSuggestions?: string;
 }
 
 export interface ProjectInput {
