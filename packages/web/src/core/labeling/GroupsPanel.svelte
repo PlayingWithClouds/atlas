@@ -4,6 +4,7 @@
 	import { activeRefinements } from './draft';
 	import GroupCard from './GroupCard.svelte';
 	import LabelSearch from './LabelSearch.svelte';
+	import { formatClock } from '../shared/time';
 	import CaretDownIcon from 'phosphor-svelte/lib/CaretDown';
 	import CaretRightIcon from 'phosphor-svelte/lib/CaretRight';
 	import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlass';
@@ -12,6 +13,15 @@
 	let { session }: { session: LabelingSession } = $props();
 
 	const moreCount = $derived(session.layout.more.length);
+
+	function labelName(groupId: string, labelId: string): string {
+		const group = session.taxonomy?.groups.find((candidate) => candidate.id === groupId);
+		const label = group?.labels.find((candidate) => candidate.id === labelId);
+		if (label === undefined) {
+			return labelId;
+		}
+		return label.name;
+	}
 
 	function refinementsOf(group: Group): Group[] {
 		if (session.taxonomy === undefined) {
@@ -52,6 +62,16 @@
 		</div>
 		{#if session.searchOpen}
 			<LabelSearch {session} />
+		{/if}
+		{#if session.openRanges.length > 0}
+			<div class="border-line bg-violet/10 flex flex-wrap items-center gap-1.5 border-b px-3 py-2 text-xs">
+				<span class="bg-violet size-2 shrink-0 animate-pulse rounded-full"></span>
+				<span class="text-muted">Started at {formatClock(session.itemStart + session.openRanges[0].start, 2)}:</span>
+				{#each session.openRanges as open (open.group + '.' + open.label)}
+					<span class="bg-violet/25 text-default rounded px-1.5 py-0.5">{labelName(open.group, open.label)}</span>
+				{/each}
+				<span class="text-faint ml-auto"><kbd class="font-mono">]</kbd> end · <kbd class="font-mono">⇧F</kbd> whole · <kbd class="font-mono">Esc</kbd> drop</span>
+			</div>
 		{/if}
 	</div>
 

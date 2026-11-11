@@ -1,5 +1,6 @@
 <script lang="ts">
-	// Search box over every asked label (/): ↑/↓ move, Enter toggles, Esc closes.
+	// Search box over every asked label (/): ↑/↓ move, Esc closes. Enter starts the label at the
+	// playhead on a video (again: drops it), else toggles it.
 	import type { Group } from '@atlas/contracts';
 	import { onMount } from 'svelte';
 	import CheckIcon from 'phosphor-svelte/lib/Check';
@@ -102,7 +103,11 @@
 						class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm {index === highlighted ? 'bg-hover text-default' : 'text-muted'}"
 					>
 						<span class="flex w-3.5 shrink-0 justify-center">
-							{#if isPicked(match)}<CheckIcon size={12} class="text-green" weight="bold" />{/if}
+							{#if session.isOpenRange(match.group.id, match.label.id)}
+								<span class="bg-violet size-2 animate-pulse rounded-full" title="Started, waiting for ]"></span>
+							{:else if isPicked(match)}
+								<CheckIcon size={12} class="text-green" weight="bold" />
+							{/if}
 						</span>
 						<span class="min-w-0 flex-1 truncate">{match.label.name}</span>
 						<span class="text-faint shrink-0 truncate text-[11px]">{groupPath(match.group)}</span>

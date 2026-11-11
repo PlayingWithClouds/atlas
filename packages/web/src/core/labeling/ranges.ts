@@ -49,6 +49,51 @@ export function stepRange(pending: PendingRange | undefined, target: RangeTarget
   return { range: { group: target.group, label: target.label, start, end } };
 }
 
+// --- open ranges (several labels started at the playhead, closed together) ----------------
+
+export function findPending(open: PendingRange[], target: RangeTarget): PendingRange | undefined {
+  return open.find((pending) => isSameTarget(pending, target));
+}
+
+/** Opens a range for the target at `time`, or drops it when it is already open. */
+export function togglePending(open: PendingRange[], target: RangeTarget, time: number): PendingRange[] {
+  if (findPending(open, target) !== undefined) {
+    return open.filter((pending) => !isSameTarget(pending, target));
+  }
+  return [...open, { group: target.group, label: target.label, start: time }];
+}
+
+/** Every open range starts over at `time`. */
+export function restartPending(open: PendingRange[], time: number): PendingRange[] {
+  return open.map((pending) => ({ ...pending, start: time }));
+}
+
+export interface ClosedRanges {
+  ranges: Range[];
+  /** Ranges too short to close; they stay open. */
+  open: PendingRange[];
+  problem?: string;
+}
+
+/** Closes every open range at `time` (either side of its start). */
+export function closePending(open: PendingRange[], time: number): ClosedRanges {
+  const ranges: Range[] = [];
+  const tooShort: PendingRange[] = [];
+  for (const pending of open) {
+    const start = Math.min(pending.start, time);
+    const end = Math.max(pending.start, time);
+    if (end - start < MIN_RANGE_SECONDS) {
+      tooShort.push(pending);
+      continue;
+    }
+    ranges.push({ group: pending.group, label: pending.label, start, end });
+  }
+  if (tooShort.length > 0) {
+    return { ranges, open: tooShort, problem: "A range needs a few frames: move the playhead first" };
+  }
+  return { ranges, open: [] };
+}
+
 function overlaps(first: Range, second: Range): boolean {
   return first.start < second.end && second.start < first.end;
 }

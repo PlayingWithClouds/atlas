@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { validateAnnotation } from '@atlas/contracts';
 import { buildAnnotationInput, emptyDraft, toggleLabel } from '../../src/core/labeling/draft';
-import { addRange, deleteRange, effectiveSpan, itemTimeOf, refineRange, removeRange, replaceRange, stepRange, trimEdge } from '../../src/core/labeling/ranges';
+import { addRange, closePending, deleteRange, effectiveSpan, itemTimeOf, refineRange, removeRange, replaceRange, restartPending, stepRange, togglePending, trimEdge } from '../../src/core/labeling/ranges';
 import { taxonomy } from './fixtures';
 
 const talking = { group: 'activity', label: 'talking' };
@@ -160,5 +160,35 @@ describe('refinement ranges', () => {
     const base = refineRange(taxonomy, withStandingRange(), withStandingRange().ranges[0], armsUp);
     const parent = base.ranges.find((range) => range.group === 'position')!;
     expect(deleteRange(taxonomy, base, parent).ranges).toEqual([]);
+  });
+});
+
+describe('open ranges', () => {
+  const talking = { group: 'activity', label: 'talking' };
+  const dancing = { group: 'activity', label: 'dancing' };
+
+  test('start several labels at the playhead; again drops one', () => {
+    const both = togglePending(togglePending([], talking, 2), dancing, 2);
+    expect(both).toEqual([{ ...talking, start: 2 }, { ...dancing, start: 2 }]);
+    expect(togglePending(both, talking, 9)).toEqual([{ ...dancing, start: 2 }]);
+  });
+
+  test('close together at the playhead, either side of the start', () => {
+    const open = [{ ...talking, start: 2 }, { ...dancing, start: 8 }];
+    expect(closePending(open, 5)).toEqual({
+      ranges: [{ ...talking, start: 2, end: 5 }, { ...dancing, start: 5, end: 8 }],
+      open: [],
+    });
+  });
+
+  test('ranges too short stay open', () => {
+    const closed = closePending([{ ...talking, start: 2 }], 2);
+    expect(closed.ranges).toEqual([]);
+    expect(closed.open).toEqual([{ ...talking, start: 2 }]);
+    expect(closed.problem).toBeDefined();
+  });
+
+  test('restart moves every start', () => {
+    expect(restartPending([{ ...talking, start: 2 }, { ...dancing, start: 3 }], 7).map((open) => open.start)).toEqual([7, 7]);
   });
 });

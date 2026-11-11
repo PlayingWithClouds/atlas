@@ -50,7 +50,8 @@
 		playhead: number;
 		frameRate: number;
 		tracks: LabelTrack[];
-		pending: PendingRange | undefined;
+		/** Labels started at the playhead, drawn from their start to the playhead. */
+		pending: PendingRange[];
 		itemStart: number;
 		/** Item length in seconds, when known. */
 		length: number | undefined;
@@ -431,10 +432,11 @@
 	}
 
 	function pendingIn(track: LabelTrack): { start: number; end: number } | undefined {
-		if (pending === undefined || pending.group !== track.group.id || pending.label !== track.label.id) {
+		const open = pending.find((candidate) => candidate.group === track.group.id && candidate.label === track.label.id);
+		if (open === undefined) {
 			return undefined;
 		}
-		const start = itemStart + pending.start;
+		const start = itemStart + open.start;
 		return { start: Math.min(start, playhead), end: Math.max(start, playhead) };
 	}
 

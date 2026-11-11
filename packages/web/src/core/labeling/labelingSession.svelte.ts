@@ -24,7 +24,7 @@ import {
 import type { Draft } from './draft';
 import { actionForKey } from './keyboardMap';
 import type { KeyPress, LabelAction } from './keyboardMap';
-import { MIN_RANGE_SECONDS, addRange, deleteRange, effectiveSpan, isSameSpan, itemTimeOf, refineRange, replaceRange, stepRange, trimEdge } from './ranges';
+import { MIN_RANGE_SECONDS, addRange, closePending, deleteRange, effectiveSpan, findPending, isSameSpan, itemTimeOf, refineRange, replaceRange, restartPending, stepRange, togglePending, trimEdge } from './ranges';
 import type { PendingRange, RangeTarget } from './ranges';
 import { acceptProposals, chooseSuggestion } from './suggestions';
 import { labelTracks, rangeBetween } from './timeline';
@@ -45,7 +45,8 @@ export class LabelingSession {
   focusedGroupId = $state<string | undefined>(undefined);
   /** The label search box at the top of the panel (/). */
   searchOpen = $state(false);
-  pendingRange = $state.raw<PendingRange | undefined>(undefined);
+  /** Ranges started at the playhead and waiting for ] (or R) to end them; several at once. */
+  openRanges = $state.raw<PendingRange[]>([]);
   /** The range clicked on the timeline; [ and ] move its edges, Backspace deletes it. */
   selectedRange = $state.raw<Range | undefined>(undefined);
   /** A range the player loops instead of the item (double-click on it). */
@@ -139,6 +140,7 @@ export class LabelingSession {
       ranges: this.draft.ranges,
       suggested,
       armed: this.armed,
+      open: this.openRanges,
     });
   });
   /** Refinement groups of the selected range's label, with the labels set for exactly its span. */
@@ -219,7 +221,7 @@ export class LabelingSession {
     this.detail = detail;
     this.draft = draftFromAnnotation(project.taxonomy, detail.annotation);
     this.loadedFingerprint = fingerprintOf(project.taxonomy, this.draft);
-    this.pendingRange = undefined;
+    this.openRanges = [];
     this.selectedRange = undefined;
     this.loopedRange = undefined;
     this.serverProblems = [];
@@ -357,7 +359,11 @@ export class LabelingSession {
     if (behindMore && !this.draft.moreExpanded) {
       this.toggleMore();
     }
-    this.toggle(group, labelId);
+    if (this.asset !== undefined && this.asset.kind === 'video') {
+      this.toggleOpenRange(group, labelId);
+    } else {
+      this.toggle(group, labelId);
+    }
     this.searchOpen = false;
   }
 
@@ -406,8 +412,16 @@ export class LabelingSession {
 
   // --- trim and ranges -----------------------------------------------------------------
 
-  /** [ and ]: the selected range's edge if one is selected, else the item's trim. */
+  /** [ and ]: open ranges start over / close; else the selected range's edge; else the item's trim. */
   setEdge(edge: 'start' | 'end'): void {
+    if (this.openRanges.length > 0 && edge === 'end') {
+      this.closeOpenRanges();
+      return;
+    }
+    if (this.openRanges.length > 0) {
+      this.openRanges = restartPending(this.openRanges, itemTimeOf(this.currentTime(), this.itemStart, this.length));
+      return;
+    }
     const selected = this.selectedRange;
     if (selected !== undefined && this.draft.ranges.includes(selected)) {
       this.moveRangeEdge(selected, edge);
@@ -463,19 +477,71 @@ export class LabelingSession {
       this.say(`Pick a label in "${group.label}" first, then press R for its range`);
       return;
     }
+    const target = { group: group.id, label: labelId };
     const time = itemTimeOf(this.currentTime(), this.itemStart, this.length);
-    this.applyRangeStep(stepRange(this.pendingRange, { group: group.id, label: labelId }, time));
-  }
-
-  private applyRangeStep(step: ReturnType<typeof stepRange>): void {
+    const step = stepRange(findPending(this.openRanges, target), target, time);
     if (step.problem !== undefined) {
       this.say(step.problem);
     }
-    this.pendingRange = step.pending;
+    const others = this.openRanges.filter((pending) => pending.group !== target.group || pending.label !== target.label);
+    if (step.pending !== undefined) {
+      this.openRanges = [...others, step.pending];
+    }
     if (step.range !== undefined) {
       const range = step.range;
+      this.openRanges = others;
       this.edit((taxonomy, draft) => addRange(taxonomy, draft, range));
     }
+  }
+
+  /** Starts a range for the label at the playhead, or drops it when it is already open. */
+  toggleOpenRange(group: Group, labelId: string): void {
+    const target = { group: group.id, label: labelId };
+    const time = itemTimeOf(this.currentTime(), this.itemStart, this.length);
+    this.openRanges = togglePending(this.openRanges, target, time);
+    this.lastTouchedLabel = { ...this.lastTouchedLabel, [group.id]: labelId };
+    this.focusedGroupId = group.id;
+  }
+
+  isOpenRange(groupId: string, labelId: string): boolean {
+    return findPending(this.openRanges, { group: groupId, label: labelId }) !== undefined;
+  }
+
+  /** ]: ends every open range at the playhead. */
+  private closeOpenRanges(): void {
+    const time = itemTimeOf(this.currentTime(), this.itemStart, this.length);
+    const closed = closePending(this.openRanges, time);
+    if (closed.problem !== undefined) {
+      this.say(closed.problem);
+    }
+    this.openRanges = closed.open;
+    for (const range of closed.ranges) {
+      this.edit((taxonomy, draft) => addRange(taxonomy, draft, range));
+    }
+    const last = closed.ranges[closed.ranges.length - 1];
+    if (last !== undefined) {
+      this.selectedRange = this.draft.ranges.find((candidate) => candidate === last);
+    }
+  }
+
+  /** Shift+F: the open labels hold for the whole item instead of a range. */
+  wholeItem(): void {
+    if (this.openRanges.length === 0) {
+      this.say('Start a label with / first, then Shift+F makes it hold for the whole scene');
+      return;
+    }
+    const taxonomy = this.taxonomy;
+    if (taxonomy === undefined) {
+      return;
+    }
+    for (const pending of this.openRanges) {
+      const group = taxonomy.groups.find((candidate) => candidate.id === pending.group);
+      if (group === undefined || valuesOfGroup(this.draft, group.id).includes(pending.label)) {
+        continue;
+      }
+      this.edit((current, draft) => toggleLabel(current, draft, group, pending.label));
+    }
+    this.openRanges = [];
   }
 
   deleteRange(range: Range): void {
@@ -553,7 +619,7 @@ export class LabelingSession {
   }
 
   cancelRange(): void {
-    this.pendingRange = undefined;
+    this.openRanges = [];
     this.selectedRange = undefined;
     this.loopedRange = undefined;
   }
@@ -659,6 +725,7 @@ export class LabelingSession {
       toggleReviewed: () => this.toggleFocusedReviewed(),
       escape: () => this.cancelRange(),
       search: () => (this.searchOpen = true),
+      wholeItem: () => this.wholeItem(),
     };
     simple[action.kind]?.();
     this.performWithArgument(action);
