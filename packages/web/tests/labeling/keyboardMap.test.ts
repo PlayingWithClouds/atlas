@@ -43,6 +43,8 @@ describe('actionForKey', () => {
     expect(actionForKey(press(']'), labels)).toEqual({ kind: 'trimEnd' });
     expect(actionForKey(press('r'), labels)).toEqual({ kind: 'range' });
     expect(actionForKey(press('?', { shiftKey: true }), labels)).toEqual({ kind: 'cheatSheet' });
+    expect(actionForKey(press('/'), labels)).toEqual({ kind: 'search' });
+    expect(actionForKey(press('/', { shiftKey: true }), labels)).toEqual({ kind: 'search' });
   });
 
   test('hotkeys of the focused group toggle their labels, ignoring case', () => {

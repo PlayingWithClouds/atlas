@@ -43,6 +43,8 @@ export class LabelingSession {
   detail = $state.raw<ItemDetail | undefined>(undefined);
   draft = $state.raw<Draft>(emptyDraft());
   focusedGroupId = $state<string | undefined>(undefined);
+  /** The label search box at the top of the panel (/). */
+  searchOpen = $state(false);
   pendingRange = $state.raw<PendingRange | undefined>(undefined);
   /** The range clicked on the timeline; [ and ] move its edges, Backspace deletes it. */
   selectedRange = $state.raw<Range | undefined>(undefined);
@@ -331,7 +333,32 @@ export class LabelingSession {
   toggle(group: Group, labelId: string): void {
     this.focusedGroupId = group.id;
     this.lastTouchedLabel = { ...this.lastTouchedLabel, [group.id]: labelId };
+    const wasPicked = valuesOfGroup(this.draft, group.id).includes(labelId);
     this.edit((taxonomy, draft) => toggleLabel(taxonomy, draft, group, labelId));
+    const isPicked = valuesOfGroup(this.draft, group.id).includes(labelId);
+    if (group.kind === 'single' && !wasPicked && isPicked) {
+      this.focusAfter(group.id);
+    }
+  }
+
+  /** A single choice is answered once picked: move on, to a refinement it just opened first. */
+  private focusAfter(groupId: string): void {
+    const groups = this.focusable;
+    const index = groups.findIndex((group) => group.id === groupId);
+    if (index < 0 || index + 1 >= groups.length) {
+      return;
+    }
+    this.focusedGroupId = groups[index + 1].id;
+  }
+
+  /** A label picked from search; a group behind "More groups" opens them first so it stays visible. */
+  pickSearched(group: Group, labelId: string): void {
+    const behindMore = this.layout.more.some((candidate) => candidate.id === group.id || candidate.id === group.when?.group);
+    if (behindMore && !this.draft.moreExpanded) {
+      this.toggleMore();
+    }
+    this.toggle(group, labelId);
+    this.searchOpen = false;
   }
 
   toggleFocusedLabel(labelId: string): void {
@@ -631,6 +658,7 @@ export class LabelingSession {
       toggleMuted: () => this.toggleMuted(),
       toggleReviewed: () => this.toggleFocusedReviewed(),
       escape: () => this.cancelRange(),
+      search: () => (this.searchOpen = true),
     };
     simple[action.kind]?.();
     this.performWithArgument(action);
