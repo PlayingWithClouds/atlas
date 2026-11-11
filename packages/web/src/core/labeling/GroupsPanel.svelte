@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Group } from '@atlas/contracts';
 	import type { LabelingSession } from './labelingSession.svelte';
+	import { activeRefinements } from './draft';
 	import GroupCard from './GroupCard.svelte';
 	import CaretDownIcon from 'phosphor-svelte/lib/CaretDown';
 	import CaretRightIcon from 'phosphor-svelte/lib/CaretRight';
@@ -9,27 +10,35 @@
 	let { session }: { session: LabelingSession } = $props();
 
 	const moreCount = $derived(session.layout.more.length);
+
+	function refinementsOf(group: Group): Group[] {
+		if (session.taxonomy === undefined) {
+			return [];
+		}
+		return activeRefinements(session.taxonomy, session.draft, group.id);
+	}
 </script>
 
 {#snippet card(group: Group)}
 	<GroupCard
 		{group}
+		refinements={refinementsOf(group)}
 		draft={session.draft}
-		focused={session.focusedGroup?.id === group.id}
+		focusedGroupId={session.focusedGroup?.id}
 		suggestion={session.suggestion}
-		onfocus={() => session.focusGroup(group.id)}
-		ontoggle={(labelId) => session.toggle(group, labelId)}
-		onreviewed={(reviewed) => session.setReviewed(group.id, reviewed)}
+		onfocus={(groupId) => session.focusGroup(groupId)}
+		ontoggle={(target, labelId) => session.toggle(target, labelId)}
+		onreviewed={(groupId, reviewed) => session.setReviewed(groupId, reviewed)}
 	/>
 {/snippet}
 
-<div class="flex flex-col gap-2">
+<div class="flex flex-col gap-1.5">
 	{#if session.suggestion}
-		<div class="border-line bg-surface flex items-center gap-2 rounded-lg border px-3 py-2 text-xs">
-			<SparkleIcon size={14} class="text-green" />
-			<span class="text-muted flex-1">Suggestions from <span class="font-mono">{session.suggestion.source}</span> are proposals, not labels.</span>
-			<button type="button" tabindex="-1" class="btn btn-sm btn-outline" disabled={!session.acceptable} onclick={() => session.acceptSuggestions()}>
-				Accept (A)
+		<div class="text-dim flex items-center gap-2 px-1 pb-1 text-xs">
+			<SparkleIcon size={13} class="text-green" />
+			<span class="flex-1">Proposals from <span class="font-mono">{session.suggestion.source}</span></span>
+			<button type="button" tabindex="-1" class="btn btn-xs btn-ghost" disabled={!session.acceptable} onmousedown={(event) => event.preventDefault()} onclick={() => session.acceptSuggestions()}>
+				Accept <span class="font-mono opacity-50">A</span>
 			</button>
 		</div>
 	{/if}
@@ -44,13 +53,12 @@
 			tabindex="-1"
 			onmousedown={(event) => event.preventDefault()}
 			onclick={() => session.toggleMore()}
-			class="text-dim hover:text-default flex items-center gap-1.5 px-1 py-1 text-left text-xs font-medium"
+			class="text-dim hover:text-default mt-1 flex items-center gap-1.5 px-1 py-1 text-left text-xs font-medium"
+			title="Groups behind More count as reviewed while open, unknown while closed (G)"
 		>
 			{#if session.draft.moreExpanded}<CaretDownIcon size={12} />{:else}<CaretRightIcon size={12} />{/if}
 			More groups ({moreCount})
-			<span class="text-faint font-normal">
-				{#if session.draft.moreExpanded}reviewed while open{:else}unknown while closed{/if} (G)
-			</span>
+			<span class="text-faint font-normal">{#if session.draft.moreExpanded}reviewed{:else}unknown{/if}</span>
 		</button>
 		{#if session.draft.moreExpanded}
 			{#each session.layout.more as group (group.id)}

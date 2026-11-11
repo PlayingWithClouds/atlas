@@ -33,8 +33,21 @@ export function hasLabels(draft: Draft, groupId: string): boolean {
   return draft.ranges.some((range) => range.group === groupId);
 }
 
-function isVisible(group: Group, draft: Draft): boolean {
-  return group.primary === true || draft.moreExpanded;
+/** A refinement (a group with a condition) is shown inside the card of the group it refines. */
+function placementOf(taxonomy: Taxonomy, group: Group): Group {
+  if (group.when === undefined) {
+    return group;
+  }
+  const parentId = group.when.group;
+  const parent = taxonomy.groups.find((candidate) => candidate.id === parentId);
+  if (parent === undefined) {
+    return group;
+  }
+  return parent;
+}
+
+function isVisible(taxonomy: Taxonomy, group: Group, draft: Draft): boolean {
+  return placementOf(taxonomy, group).primary === true || draft.moreExpanded;
 }
 
 function isOffered(label: { deprecated?: boolean }, isSet: boolean): boolean {
@@ -57,11 +70,23 @@ export interface GroupLayout {
   more: Group[];
 }
 
-/** Groups to show now: conditional ones only while active, others split into primary and "more". */
+function isAsked(group: Group, draft: Draft): boolean {
+  return isGroupActive(group, draft.values, draft.ranges) && !hasNothingToAsk(group, draft);
+}
+
+/** The refinements of `groupId` that are asked now: groups whose condition is one of its labels and is on. */
+export function activeRefinements(taxonomy: Taxonomy, draft: Draft, groupId: string): Group[] {
+  return taxonomy.groups.filter((group) => group.when !== undefined && group.when.group === groupId && isAsked(group, draft));
+}
+
+/**
+ * Top-level groups to show now, split into primary and "more". Refinements are not listed: they
+ * show inside the card of the group they refine (activeRefinements).
+ */
 export function layoutGroups(taxonomy: Taxonomy, draft: Draft): GroupLayout {
   const layout: GroupLayout = { primary: [], more: [] };
   for (const group of taxonomy.groups) {
-    if (!isGroupActive(group, draft.values, draft.ranges) || hasNothingToAsk(group, draft)) {
+    if (group.when !== undefined || !isAsked(group, draft)) {
       continue;
     }
     if (group.primary === true) {
@@ -73,13 +98,14 @@ export function layoutGroups(taxonomy: Taxonomy, draft: Draft): GroupLayout {
   return layout;
 }
 
-/** The groups ↑/↓ can move between, in screen order. */
+/** The groups ↑/↓ can move between, in screen order: each group followed by its active refinements. */
 export function focusableGroups(taxonomy: Taxonomy, draft: Draft): Group[] {
   const layout = layoutGroups(taxonomy, draft);
+  let shown = layout.primary;
   if (draft.moreExpanded) {
-    return [...layout.primary, ...layout.more];
+    shown = [...layout.primary, ...layout.more];
   }
-  return layout.primary;
+  return shown.flatMap((group) => [group, ...activeRefinements(taxonomy, draft, group.id)]);
 }
 
 // --- reviewed ----------------------------------------------------------------------------
@@ -89,21 +115,21 @@ export function focusableGroups(taxonomy: Taxonomy, draft: Draft): Group[] {
  * or "More groups" open) without the person marking it "not reviewed". Collapsed groups stay
  * unknown; a group with an unmet condition is never reviewed.
  */
-export function isReviewed(group: Group, draft: Draft): boolean {
+export function isReviewed(taxonomy: Taxonomy, group: Group, draft: Draft): boolean {
   if (!isGroupActive(group, draft.values, draft.ranges)) {
     return false;
   }
   if (hasLabels(draft, group.id)) {
     return true;
   }
-  if (!isVisible(group, draft)) {
+  if (!isVisible(taxonomy, group, draft)) {
     return false;
   }
   return !draft.notReviewed.includes(group.id);
 }
 
 export function reviewedGroupIds(taxonomy: Taxonomy, draft: Draft): string[] {
-  return taxonomy.groups.filter((group) => isReviewed(group, draft)).map((group) => group.id);
+  return taxonomy.groups.filter((group) => isReviewed(taxonomy, group, draft)).map((group) => group.id);
 }
 
 // --- editing -----------------------------------------------------------------------------
@@ -204,11 +230,11 @@ function rangesOfAnnotation(annotation: Annotation): Range[] {
   return annotation.ranges;
 }
 
-function isOnScreenAtLoad(group: Group, annotation: Annotation, moreExpanded: boolean): boolean {
+function isOnScreenAtLoad(taxonomy: Taxonomy, group: Group, annotation: Annotation, moreExpanded: boolean): boolean {
   if (!isGroupActive(group, annotation.values, rangesOfAnnotation(annotation))) {
     return false;
   }
-  return group.primary === true || moreExpanded;
+  return placementOf(taxonomy, group).primary === true || moreExpanded;
 }
 
 /** An existing annotation reopens with its groups reviewed; visible groups it did not review show as "not reviewed". */
@@ -217,10 +243,10 @@ export function draftFromAnnotation(taxonomy: Taxonomy, annotation: Annotation |
     return emptyDraft();
   }
   const moreExpanded = taxonomy.groups.some(
-    (group) => group.primary !== true && annotation.reviewed.includes(group.id),
+    (group) => placementOf(taxonomy, group).primary !== true && annotation.reviewed.includes(group.id),
   );
   const notReviewed = taxonomy.groups
-    .filter((group) => isOnScreenAtLoad(group, annotation, moreExpanded))
+    .filter((group) => isOnScreenAtLoad(taxonomy, group, annotation, moreExpanded))
     .filter((group) => !annotation.reviewed.includes(group.id))
     .map((group) => group.id);
   return {

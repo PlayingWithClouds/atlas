@@ -112,10 +112,16 @@ export interface LabelTrack {
   whole: boolean;
   /** Item-relative. */
   ranges: Range[];
+  /** Refinement labels drawn inside each bar (same order as `ranges`): those set for exactly its span or for the whole item. */
+  rangeNotes: string[];
+  /** Refinement labels set for the whole item, drawn on the whole-item bar. */
+  wholeNote: string;
   /** Model ranges not yet taken over, item-relative. */
   ghosts: SuggestedRange[];
   /** The label R or a drag in the track would use. */
   armed: boolean;
+  /** A refinement (e.g. facefuck) shown under the label it refines (blowjob). */
+  refines?: RangeTarget;
 }
 
 export interface TrackInputs {
@@ -130,8 +136,16 @@ function overlaps(first: Range, second: Range): boolean {
   return first.start < second.end && second.start < first.end;
 }
 
+function isSpanOf(first: Range, second: Range): boolean {
+  return Math.abs(first.start - second.start) < 0.001 && Math.abs(first.end - second.end) < 0.001;
+}
+
+function isActive(inputs: TrackInputs, group: Group): boolean {
+  return isGroupActive(group, inputs.values, inputs.ranges);
+}
+
 function ghostsOf(inputs: TrackInputs, group: Group, label: Label, ranges: Range[]): SuggestedRange[] {
-  if (!isGroupActive(group, inputs.values, inputs.ranges)) {
+  if (!isActive(inputs, group)) {
     return [];
   }
   return inputs.suggested.filter(
@@ -147,27 +161,99 @@ function isArmed(inputs: TrackInputs, group: Group, label: Label): boolean {
   return inputs.armed !== undefined && inputs.armed.group === group.id && inputs.armed.label === label.id;
 }
 
-function trackOf(inputs: TrackInputs, group: Group, label: Label): LabelTrack | undefined {
+function refinementsOf(inputs: TrackInputs, group: Group, label: Label): Group[] {
+  return inputs.groups.filter(
+    (candidate) => candidate.when !== undefined && candidate.when.group === group.id && candidate.when.label === label.id && isActive(inputs, candidate),
+  );
+}
+
+function valuesOf(inputs: TrackInputs, groupId: string): string[] {
+  const labelIds = inputs.values[groupId];
+  if (labelIds === undefined) {
+    return [];
+  }
+  return labelIds;
+}
+
+function namesOf(group: Group, labelIds: string[]): string[] {
+  return group.labels.filter((label) => labelIds.includes(label.id)).map((label) => label.name);
+}
+
+/** Refinement labels of `refinements` that hold for the whole item. */
+function wholeRefinementNames(inputs: TrackInputs, refinements: Group[]): string[] {
+  return refinements.flatMap((refinement) => namesOf(refinement, valuesOf(inputs, refinement.id)));
+}
+
+/** Refinement labels set for exactly the span of a parent range. */
+function noteOf(inputs: TrackInputs, refinements: Group[], parent: Range, wholeNames: string[]): string {
+  const exact = refinements.flatMap((refinement) =>
+    namesOf(
+      refinement,
+      inputs.ranges.filter((range) => range.group === refinement.id && isSpanOf(range, parent)).map((range) => range.label),
+    ),
+  );
+  return [...wholeNames, ...exact].join(', ');
+}
+
+/** A refinement range that matches a parent bar exactly is drawn inside that bar, not in its own track. */
+function isAbsorbed(inputs: TrackInputs, range: Range, refines: RangeTarget | undefined): boolean {
+  if (refines === undefined) {
+    return false;
+  }
+  return inputs.ranges.some((parent) => parent.group === refines.group && parent.label === refines.label && isSpanOf(parent, range));
+}
+
+function trackOf(inputs: TrackInputs, group: Group, label: Label, refines?: RangeTarget): LabelTrack | undefined {
   const values = inputs.values[group.id];
-  const whole = values !== undefined && values.includes(label.id);
-  const ranges = inputs.ranges.filter((range) => range.group === group.id && range.label === label.id);
-  const ghosts = ghostsOf(inputs, group, label, ranges);
+  const whole = refines === undefined && values !== undefined && values.includes(label.id);
+  const all = inputs.ranges.filter((range) => range.group === group.id && range.label === label.id);
+  const ranges = all.filter((range) => !isAbsorbed(inputs, range, refines));
+  const ghosts = ghostsOf(inputs, group, label, all);
   const armed = isArmed(inputs, group, label);
   if (!whole && ranges.length === 0 && ghosts.length === 0 && !armed) {
     return undefined;
   }
-  return { group, label, whole, ranges, ghosts, armed };
+  // A refinement set for the whole item is already noted on its parent's bars.
+  if (refines !== undefined && ranges.length === 0 && ghosts.length === 0 && valuesOf(inputs, group.id).includes(label.id)) {
+    return undefined;
+  }
+  const refinements = refinementsOf(inputs, group, label);
+  const wholeNames = wholeRefinementNames(inputs, refinements);
+  const rangeNotes = ranges.map((range) => noteOf(inputs, refinements, range, wholeNames));
+  return { group, label, whole, ranges, rangeNotes, wholeNote: wholeNames.join(', '), ghosts, armed, refines };
 }
 
-/** Tracks in taxonomy order: everything that is on, suggested as a range, or armed. */
+function refinementTracks(inputs: TrackInputs, group: Group, label: Label): LabelTrack[] {
+  const refines = { group: group.id, label: label.id };
+  return refinementsOf(inputs, group, label).flatMap((refinement) =>
+    refinement.labels.flatMap((refinementLabel) => {
+      const track = trackOf(inputs, refinement, refinementLabel, refines);
+      if (track === undefined) {
+        return [];
+      }
+      return [track];
+    }),
+  );
+}
+
+function isNested(inputs: TrackInputs, group: Group): boolean {
+  const condition = group.when;
+  return condition !== undefined && inputs.groups.some((candidate) => candidate.id === condition.group);
+}
+
+/**
+ * Tracks in taxonomy order, everything that is on, suggested as a range, or armed. A refinement
+ * group's tracks follow the label it refines instead of standing on their own.
+ */
 export function labelTracks(inputs: TrackInputs): LabelTrack[] {
   const tracks: LabelTrack[] = [];
-  for (const group of inputs.groups) {
+  for (const group of inputs.groups.filter((candidate) => !isNested(inputs, candidate))) {
     for (const label of group.labels) {
       const track = trackOf(inputs, group, label);
       if (track !== undefined) {
         tracks.push(track);
       }
+      tracks.push(...refinementTracks(inputs, group, label));
     }
   }
   return tracks;

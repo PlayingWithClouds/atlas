@@ -6,6 +6,7 @@ import { apiItemPath, labelPath, queuePath } from '../queue/itemLink';
 import { messageOf, problemsOf } from '../shared/errors';
 import {
   buildAnnotationInput,
+  activeRefinements,
   clearGroup,
   copyValues,
   draftFromAnnotation,
@@ -23,7 +24,7 @@ import {
 import type { Draft } from './draft';
 import { actionForKey } from './keyboardMap';
 import type { KeyPress, LabelAction } from './keyboardMap';
-import { MIN_RANGE_SECONDS, addRange, effectiveSpan, itemTimeOf, removeRange, stepRange, trimEdge } from './ranges';
+import { MIN_RANGE_SECONDS, addRange, deleteRange, effectiveSpan, isSameSpan, itemTimeOf, refineRange, replaceRange, stepRange, trimEdge } from './ranges';
 import type { PendingRange, RangeTarget } from './ranges';
 import { acceptProposals, chooseSuggestion } from './suggestions';
 import { labelTracks, rangeBetween } from './timeline';
@@ -137,6 +138,20 @@ export class LabelingSession {
       suggested,
       armed: this.armed,
     });
+  });
+  /** Refinement groups of the selected range's label, with the labels set for exactly its span. */
+  readonly selectedRefinements = $derived.by(() => {
+    const selected = this.selectedRange;
+    if (this.taxonomy === undefined || selected === undefined || !this.draft.ranges.includes(selected)) {
+      return [];
+    }
+    return activeRefinements(this.taxonomy, this.draft, selected.group)
+      .filter((group) => group.when !== undefined && group.when.label === selected.label)
+      .map((group) => ({
+        group,
+        chosen: this.draft.ranges.filter((range) => range.group === group.id && isSameSpan(range, selected)).map((range) => range.label),
+        wholeItem: valuesOfGroup(this.draft, group.id),
+      }));
   });
   readonly acceptable = $derived.by(() => {
     if (this.taxonomy === undefined) {
@@ -433,7 +448,7 @@ export class LabelingSession {
   }
 
   deleteRange(range: Range): void {
-    this.edit((_taxonomy, draft) => removeRange(draft, range));
+    this.edit((taxonomy, draft) => deleteRange(taxonomy, draft, range));
     if (this.selectedRange === range) {
       this.selectedRange = undefined;
     }
@@ -457,7 +472,7 @@ export class LabelingSession {
 
   /** Swaps a range for its edited copy; the selection and loop follow it. */
   replaceRange(previous: Range, next: Range): void {
-    this.edit((taxonomy, draft) => addRange(taxonomy, removeRange(draft, previous), next));
+    this.edit((taxonomy, draft) => replaceRange(taxonomy, draft, previous, next));
     if (this.selectedRange === previous) {
       this.selectedRange = next;
     }
@@ -470,6 +485,15 @@ export class LabelingSession {
     const range = { group: suggested.group, label: suggested.label, start: suggested.start, end: suggested.end };
     this.edit((taxonomy, draft) => addRange(taxonomy, draft, range));
     this.selectedRange = range;
+  }
+
+  /** Sets or clears a refinement label (e.g. facefuck) for exactly the selected range's span. */
+  refineSelected(target: RangeTarget): void {
+    const selected = this.selectedRange;
+    if (selected === undefined) {
+      return;
+    }
+    this.edit((taxonomy, draft) => refineRange(taxonomy, draft, selected, target));
   }
 
   selectRange(range: Range | undefined): void {

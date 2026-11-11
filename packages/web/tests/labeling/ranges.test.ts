@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { validateAnnotation } from '@atlas/contracts';
 import { buildAnnotationInput, emptyDraft, toggleLabel } from '../../src/core/labeling/draft';
-import { addRange, effectiveSpan, itemTimeOf, removeRange, stepRange, trimEdge } from '../../src/core/labeling/ranges';
+import { addRange, deleteRange, effectiveSpan, itemTimeOf, refineRange, removeRange, replaceRange, stepRange, trimEdge } from '../../src/core/labeling/ranges';
 import { taxonomy } from './fixtures';
 
 const talking = { group: 'activity', label: 'talking' };
@@ -107,5 +107,58 @@ describe('trimming', () => {
     expect(effectiveSpan(span, undefined, 300)).toEqual(span);
     expect(effectiveSpan(undefined, undefined, 300)).toEqual({ start: 0, end: 300 });
     expect(effectiveSpan(undefined, undefined, undefined)).toBeUndefined();
+  });
+});
+
+describe('refinement ranges', () => {
+  const standingRange = { group: 'position', label: 'standing', start: 2, end: 6 };
+  const armsUp = { group: 'pose', label: 'arms-up' };
+
+  function withStandingRange() {
+    return addRange(taxonomy, emptyDraft(), standingRange);
+  }
+
+  test('a refinement range puts its parent label on there too', () => {
+    const draft = addRange(taxonomy, emptyDraft(), { ...armsUp, start: 1, end: 3 });
+    expect(draft.ranges).toContainEqual({ group: 'position', label: 'standing', start: 1, end: 3 });
+  });
+
+  test('a refinement range grows the parent range it reaches past', () => {
+    const draft = addRange(taxonomy, withStandingRange(), { ...armsUp, start: 5, end: 8 });
+    const parents = draft.ranges.filter((range) => range.group === 'position');
+    expect(parents).toEqual([{ group: 'position', label: 'standing', start: 2, end: 8 }]);
+  });
+
+  test('a parent holding for the whole item needs no range', () => {
+    const whole = toggleLabel(taxonomy, emptyDraft(), taxonomy.groups[0], 'standing');
+    const draft = addRange(taxonomy, whole, { ...armsUp, start: 1, end: 3 });
+    expect(draft.ranges.filter((range) => range.group === 'position')).toEqual([]);
+  });
+
+  test('refining a parent range sets the label for exactly its span, again clears it', () => {
+    const base = withStandingRange();
+    const parent = base.ranges[0];
+    const refined = refineRange(taxonomy, base, parent, armsUp);
+    expect(refined.ranges).toContainEqual({ ...armsUp, start: 2, end: 6 });
+    const cleared = refineRange(taxonomy, refined, refined.ranges.find((range) => range.group === 'position')!, armsUp);
+    expect(cleared.ranges.filter((range) => range.group === 'pose')).toEqual([]);
+  });
+
+  test('refinements follow their parent when it moves or is resized', () => {
+    const base = refineRange(taxonomy, withStandingRange(), withStandingRange().ranges[0], armsUp);
+    const parent = base.ranges.find((range) => range.group === 'position')!;
+    const moved = replaceRange(taxonomy, base, parent, { ...parent, start: 4, end: 8 });
+    expect(moved.ranges).toContainEqual({ ...armsUp, start: 4, end: 8 });
+
+    const partial = addRange(taxonomy, withStandingRange(), { ...armsUp, start: 3, end: 5 });
+    const partialParent = partial.ranges.find((range) => range.group === 'position')!;
+    const shrunk = replaceRange(taxonomy, partial, partialParent, { ...partialParent, end: 4 });
+    expect(shrunk.ranges).toContainEqual({ ...armsUp, start: 3, end: 4 });
+  });
+
+  test('deleting the parent range takes its refinements along', () => {
+    const base = refineRange(taxonomy, withStandingRange(), withStandingRange().ranges[0], armsUp);
+    const parent = base.ranges.find((range) => range.group === 'position')!;
+    expect(deleteRange(taxonomy, base, parent).ranges).toEqual([]);
   });
 });

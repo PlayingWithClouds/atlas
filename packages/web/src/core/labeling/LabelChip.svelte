@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { Label } from '@atlas/contracts';
-	import Key from '../../lib/components/Key.svelte';
 	import { ACCEPT_THRESHOLD, DISPLAY_THRESHOLD } from './suggestions';
 	import ClockIcon from 'phosphor-svelte/lib/Clock';
 
@@ -29,20 +28,31 @@
 		if (probability === undefined) {
 			return '';
 		}
-		return `${Math.round(probability * 100)}%`;
+		return `${Math.round(probability * 100)}`;
 	});
 
 	const look = $derived.by(() => {
 		if (selected) {
 			return 'bg-action text-action-fg border-transparent';
 		}
+		if (hasRange) {
+			return 'border-violet/70 bg-violet/10 text-default hover:bg-violet/20';
+		}
 		if (proposed && strong) {
-			return 'border-green text-default hover:bg-green-soft';
+			return 'border-green/70 text-default hover:bg-green-soft';
+		}
+		return 'border-line-faint text-muted hover:text-default hover:border-line hover:bg-hover';
+	});
+
+	const tooltip = $derived.by(() => {
+		const parts = [label.name];
+		if (label.description) {
+			parts.push(label.description);
 		}
 		if (hasRange) {
-			return 'border-violet text-default hover:bg-hover';
+			parts.push('Holds for part of the item (see the timeline)');
 		}
-		return 'border-line text-muted hover:text-default hover:bg-hover';
+		return parts.join(' · ');
 	});
 </script>
 
@@ -52,18 +62,18 @@
 	tabindex="-1"
 	{onclick}
 	onmousedown={(event) => event.preventDefault()}
-	title={label.description}
+	title={tooltip}
 	aria-pressed={selected}
-	class="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-sm transition-colors {look} {label.deprecated ? 'opacity-60' : ''}"
+	class="flex h-8 min-w-0 items-center gap-1.5 rounded-md border px-2 text-left text-[13px] transition-colors {look} {label.deprecated ? 'opacity-60' : ''}"
 >
 	{#if label.image}
-		<img src={label.image} alt="" loading="lazy" class="h-8 w-8 shrink-0 rounded object-cover" />
+		<img src={label.image} alt="" loading="lazy" class="-ml-1 h-6 w-6 shrink-0 rounded object-cover" />
 	{/if}
-	<span class="leading-tight">{label.name}</span>
-	{#if label.deprecated}<span class="text-faint text-[10px] uppercase">old</span>{/if}
-	{#if hasRange}<ClockIcon size={12} class="text-violet" />{/if}
+	<span class="min-w-0 flex-1 truncate">{label.name}</span>
+	{#if label.deprecated}<span class="text-[10px] uppercase opacity-60">old</span>{/if}
+	{#if hasRange}<ClockIcon size={12} class={selected ? '' : 'text-violet'} />{/if}
 	{#if proposed}
-		<span class="font-mono text-[11px] {strong ? 'text-green' : 'text-dim'}">{percent}</span>
+		<span class="font-mono text-[10px] tabular-nums {strong ? 'text-green' : 'text-faint'}">{percent}</span>
 	{/if}
-	{#if badge}<Key label={badge} />{/if}
+	{#if badge}<span class="shrink-0 font-mono text-[10px] opacity-40">{badge}</span>{/if}
 </button>

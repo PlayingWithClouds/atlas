@@ -117,8 +117,11 @@ export class Stills {
   }
 }
 
-/** Draws a still into a canvas, letterboxed, at the canvas's on-screen size. */
-export function paintStill(canvas: HTMLCanvasElement, still: Still): void {
+/** Draws a still into a canvas, letterboxed, at the canvas's on-screen size; unmounted canvases are skipped. */
+export function paintStill(canvas: HTMLCanvasElement | null | undefined, still: Still): void {
+  if (!(canvas instanceof HTMLCanvasElement) || !canvas.isConnected) {
+    return;
+  }
   const ratio = window.devicePixelRatio || 1;
   const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
   const height = Math.max(1, Math.round(canvas.clientHeight * ratio));

@@ -45,9 +45,8 @@
 			if (owner !== mine) {
 				return;
 			}
-			const cell = cells[index];
-			if (still !== undefined && cell !== undefined) {
-				paintStill(cell, still);
+			if (still !== undefined) {
+				paintStill(cells[index], still);
 			}
 		}
 	}

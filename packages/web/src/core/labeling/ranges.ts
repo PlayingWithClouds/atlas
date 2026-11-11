@@ -62,9 +62,16 @@ function rangesWith(group: Group, ranges: Range[], added: Range): Range[] {
   return [...kept, added];
 }
 
-/** A label that now holds for part of the item no longer holds for all of it. */
+function findGroup(taxonomy: Taxonomy, groupId: string): Group | undefined {
+  return taxonomy.groups.find((candidate) => candidate.id === groupId);
+}
+
+/**
+ * A label that now holds for part of the item no longer holds for all of it. A refinement's range
+ * (e.g. facefuck under blowjob) also puts its parent label on there.
+ */
 export function addRange(taxonomy: Taxonomy, draft: Draft, range: Range): Draft {
-  const group = taxonomy.groups.find((candidate) => candidate.id === range.group);
+  const group = findGroup(taxonomy, range.group);
   if (group === undefined) {
     return draft;
   }
@@ -76,11 +83,113 @@ export function addRange(taxonomy: Taxonomy, draft: Draft, range: Range): Draft 
     values[group.id] = wholeItem;
   }
   const ranges = rangesWith(group, draft.ranges, range);
-  return pruneInactive(taxonomy, { ...draft, values, ranges });
+  return pruneInactive(taxonomy, coverParent(taxonomy, { ...draft, values, ranges }, group, range));
 }
 
 export function removeRange(draft: Draft, range: Range): Draft {
   return { ...draft, ranges: draft.ranges.filter((candidate) => candidate !== range) };
+}
+
+// --- refinements ---------------------------------------------------------------------------
+
+function isLabel(range: Range, target: RangeTarget): boolean {
+  return range.group === target.group && range.label === target.label;
+}
+
+/** Grows (or adds) the parent label's range so it covers a refinement range, unless the parent holds for the whole item. */
+function coverParent(taxonomy: Taxonomy, draft: Draft, group: Group, range: Range): Draft {
+  const condition = group.when;
+  if (condition === undefined || valuesOfGroup(draft, condition.group).includes(condition.label)) {
+    return draft;
+  }
+  const parentGroup = findGroup(taxonomy, condition.group);
+  if (parentGroup === undefined) {
+    return draft;
+  }
+  const touching = draft.ranges.filter((candidate) => isLabel(candidate, condition) && candidate.start <= range.end && range.start <= candidate.end);
+  if (touching.some((candidate) => candidate.start <= range.start && candidate.end >= range.end)) {
+    return draft;
+  }
+  const merged = {
+    group: condition.group,
+    label: condition.label,
+    start: Math.min(range.start, ...touching.map((candidate) => candidate.start)),
+    end: Math.max(range.end, ...touching.map((candidate) => candidate.end)),
+  };
+  const others = draft.ranges.filter((candidate) => !touching.includes(candidate));
+  return { ...draft, ranges: rangesWith(parentGroup, others, merged) };
+}
+
+function refinementIdsOf(taxonomy: Taxonomy, target: RangeTarget): string[] {
+  return taxonomy.groups
+    .filter((group) => group.when !== undefined && group.when.group === target.group && group.when.label === target.label)
+    .map((group) => group.id);
+}
+
+function followedRange(refinement: Range, previous: Range, next: Range): Range | undefined {
+  if (isSameSpan(refinement, previous)) {
+    return { ...refinement, start: next.start, end: next.end };
+  }
+  const moved = Math.abs(next.end - next.start - (previous.end - previous.start)) < 1e-6;
+  if (moved) {
+    const shift = next.start - previous.start;
+    return { ...refinement, start: refinement.start + shift, end: refinement.end + shift };
+  }
+  const start = Math.max(refinement.start, next.start);
+  const end = Math.min(refinement.end, next.end);
+  if (end - start < MIN_RANGE_SECONDS) {
+    return undefined;
+  }
+  return { ...refinement, start, end };
+}
+
+/** Refinement ranges inside a parent range follow its edit: shifted when it moved, clipped when resized. */
+export function carryRefinements(taxonomy: Taxonomy, draft: Draft, previous: Range, next: Range): Draft {
+  const refinementIds = refinementIdsOf(taxonomy, previous);
+  if (refinementIds.length === 0) {
+    return draft;
+  }
+  const ranges = draft.ranges.flatMap((range) => {
+    if (!refinementIds.includes(range.group) || !overlaps(range, previous)) {
+      return [range];
+    }
+    const followed = followedRange(range, previous, next);
+    if (followed === undefined) {
+      return [];
+    }
+    return [followed];
+  });
+  return { ...draft, ranges };
+}
+
+function isCoveredByParent(taxonomy: Taxonomy, draft: Draft, range: Range): boolean {
+  const condition = findGroup(taxonomy, range.group)?.when;
+  if (condition === undefined || valuesOfGroup(draft, condition.group).includes(condition.label)) {
+    return true;
+  }
+  return draft.ranges.some((candidate) => isLabel(candidate, condition) && overlaps(candidate, range));
+}
+
+/** Deletes a range; refinement ranges that only lived inside it go with it. */
+export function deleteRange(taxonomy: Taxonomy, draft: Draft, range: Range): Draft {
+  const removed = removeRange(draft, range);
+  const ranges = removed.ranges.filter((candidate) => isCoveredByParent(taxonomy, removed, candidate));
+  return pruneInactive(taxonomy, { ...removed, ranges });
+}
+
+/** Swaps a range for its edited copy, taking its refinements along. */
+export function replaceRange(taxonomy: Taxonomy, draft: Draft, previous: Range, next: Range): Draft {
+  const replaced = addRange(taxonomy, removeRange(draft, previous), next);
+  return carryRefinements(taxonomy, replaced, previous, next);
+}
+
+/** Sets (or, when already set, clears) a refinement label for exactly the span of a parent range. */
+export function refineRange(taxonomy: Taxonomy, draft: Draft, parent: Range, target: RangeTarget): Draft {
+  const existing = draft.ranges.find((range) => isLabel(range, target) && isSameSpan(range, parent));
+  if (existing !== undefined) {
+    return removeRange(draft, existing);
+  }
+  return addRange(taxonomy, draft, { ...target, start: parent.start, end: parent.end });
 }
 
 // --- trimming ----------------------------------------------------------------------------
@@ -106,7 +215,8 @@ export function effectiveSpan(itemSpan: Span | undefined, trimmed: Span | undefi
   return undefined;
 }
 
-function isSameSpan(first: Span, second: Span): boolean {
+/** Equal to the millisecond. */
+export function isSameSpan(first: Span, second: Span): boolean {
   return Math.abs(first.start - second.start) < 0.001 && Math.abs(first.end - second.end) < 0.001;
 }
 

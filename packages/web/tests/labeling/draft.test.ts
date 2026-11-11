@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { validateAnnotation } from '@atlas/contracts';
 import type { Annotation } from '@atlas/contracts';
 import {
+  activeRefinements,
   buildAnnotationInput,
   clearGroup,
   copyValues,
@@ -96,11 +97,18 @@ describe('toggling labels', () => {
 });
 
 describe('layout', () => {
-  test('conditional groups appear only while active and "more" groups are separate', () => {
+  test('refinements nest under the group they refine, only while active; "more" groups are separate', () => {
     expect(layoutGroups(taxonomy, emptyDraft()).primary.map((group) => group.id)).toEqual(['position', 'activity']);
+    expect(activeRefinements(taxonomy, emptyDraft(), 'position')).toEqual([]);
     const standing = toggleLabel(taxonomy, emptyDraft(), position, 'standing');
-    expect(layoutGroups(taxonomy, standing).primary.map((group) => group.id)).toEqual(['position', 'pose', 'activity']);
+    expect(layoutGroups(taxonomy, standing).primary.map((group) => group.id)).toEqual(['position', 'activity']);
+    expect(activeRefinements(taxonomy, standing, 'position').map((group) => group.id)).toEqual(['pose']);
     expect(layoutGroups(taxonomy, standing).more.map((group) => group.id)).toEqual(['extras']);
+  });
+
+  test('arrow navigation visits a refinement right after its group', () => {
+    const standing = toggleLabel(taxonomy, emptyDraft(), position, 'standing');
+    expect(focusableGroups(taxonomy, standing).map((group) => group.id)).toEqual(['position', 'pose', 'activity']);
   });
 
   test('arrow navigation reaches "more" groups only once they are open', () => {
