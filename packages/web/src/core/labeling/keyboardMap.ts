@@ -37,6 +37,7 @@ export type LabelAction =
   | { kind: "cheatSheet" }
   | { kind: "search" }
   | { kind: "wholeItem" }
+  | { kind: "acceptHere" }
   | { kind: "escape" };
 
 export const SEEK_STEP_SECONDS = 2;
@@ -57,14 +58,13 @@ function hasCommandModifier(press: KeyPress): boolean {
 const SPECIAL_KEYS: Record<string, LabelAction> = {
   ArrowUp: { kind: "focusGroup", offset: -1 },
   ArrowDown: { kind: "focusGroup", offset: 1 },
-  Enter: { kind: "save" },
   Backspace: { kind: "clearGroup" },
   Delete: { kind: "clearGroup" },
   Escape: { kind: "escape" },
 };
 
 const LETTER_KEYS: Record<string, LabelAction> = {
-  s: { kind: "skip" },
+  s: { kind: "acceptHere" },
   a: { kind: "acceptProposals" },
   c: { kind: "copyPrevious" },
   r: { kind: "range" },
@@ -120,6 +120,20 @@ function tabAction(press: KeyPress): LabelAction | undefined {
   return { kind: "focusGroup", offset: 1 };
 }
 
+/** Save and skip sit behind Alt, so a stray Enter or Esc never ends an item. */
+function altAction(press: KeyPress): LabelAction | undefined {
+  if (!press.altKey || press.ctrlKey || press.metaKey) {
+    return undefined;
+  }
+  if (press.key === "Enter") {
+    return { kind: "save" };
+  }
+  if (press.key === "Escape") {
+    return { kind: "skip" };
+  }
+  return undefined;
+}
+
 function labelAction(key: string, labels: KeyedLabel[]): LabelAction | undefined {
   const byHotkey = labels.find((label) => label.hotkey !== undefined && label.hotkey.toLowerCase() === key.toLowerCase());
   if (byHotkey !== undefined) {
@@ -139,6 +153,10 @@ function labelAction(key: string, labels: KeyedLabel[]): LabelAction | undefined
  * then the focused group's hotkeys, then digits 1-9 by position.
  */
 export function actionForKey(press: KeyPress, focusedLabels: KeyedLabel[]): LabelAction | undefined {
+  const alt = altAction(press);
+  if (alt !== undefined) {
+    return alt;
+  }
   if (hasCommandModifier(press)) {
     return undefined;
   }
@@ -192,8 +210,9 @@ export const KEY_HELP: KeyHelp[] = [
   { keys: ["←", "→"], action: "Seek 2 s", compact: true, short: "2 s" },
   { keys: [",", "."], action: "One frame back / forward", compact: true, short: "frame" },
   { keys: ["Shift", ", ."], action: "Ten frames back / forward", compact: false },
-  { keys: ["Enter"], action: "Save and open the next item", compact: true, short: "save" },
-  { keys: ["S"], action: "Skip the item", compact: true, short: "skip" },
+  { keys: ["S"], action: "Take the suggested sections under the playhead, from here to their end", compact: true, short: "take" },
+  { keys: ["Alt", "Enter"], action: "Save and open the next item", compact: true, short: "save" },
+  { keys: ["Alt", "Esc"], action: "Skip the item", compact: true, short: "skip" },
   { keys: ["A"], action: "Accept suggestions of 50 % or more", compact: true, short: "accept" },
   { keys: ["C"], action: "Copy labels from the previous scene of this video", compact: false },
   { keys: ["Backspace"], action: "Delete the selected range, else clear the focused group", compact: false },

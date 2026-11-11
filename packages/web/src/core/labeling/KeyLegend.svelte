@@ -12,7 +12,7 @@
 	}
 </script>
 
-<div class="text-faint flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 py-1.5 text-[11px]">
+<div class="text-faint flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 py-1.5 text-xs">
 	{#each compactHelp as entry (entry.action)}
 		<span class="flex items-center gap-1" title={entry.action}>
 			<span class="text-dim font-mono">{entry.keys.join(' ')}</span>

@@ -1,4 +1,4 @@
-import { itemLength, validateAnnotation } from '@atlas/contracts';
+import { isGroupActive, itemLength, validateAnnotation } from '@atlas/contracts';
 import type { AnnotationStatus, Group, ItemDetail, ItemView, Project, Range } from '@atlas/contracts';
 import type { PlayerHandle } from '@atlas/contracts/web';
 import type { Context } from '@neoworks/extension-system';
@@ -27,7 +27,7 @@ import type { KeyPress, LabelAction } from './keyboardMap';
 import { MIN_RANGE_SECONDS, addRange, closePending, deleteRange, effectiveSpan, findPending, isSameSpan, itemTimeOf, refineRange, replaceRange, restartPending, stepRange, togglePending, trimEdge } from './ranges';
 import type { PendingRange, RangeTarget } from './ranges';
 import { acceptProposals, chooseSuggestion } from './suggestions';
-import { labelTracks, rangeBetween } from './timeline';
+import { labelTracks, rangeBetween, rangesFromHere } from './timeline';
 import type { SuggestedRange } from './timeline';
 
 const NOTICE_LIFETIME_MS = 4000;
@@ -38,6 +38,16 @@ function isRepeatable(action: LabelAction): boolean {
 }
 
 /** Everything the labeling screen knows and can do for one item at a time. */
+function tookMessage(count: number): string {
+  if (count === 0) {
+    return 'No suggested section at the playhead';
+  }
+  if (count === 1) {
+    return 'Took 1 suggested section from here';
+  }
+  return `Took ${count} suggested sections from here`;
+}
+
 export class LabelingSession {
   project = $state.raw<Project | undefined>(undefined);
   detail = $state.raw<ItemDetail | undefined>(undefined);
@@ -524,6 +534,29 @@ export class LabelingSession {
     }
   }
 
+  /** S: suggested sections under the playhead become ranges from here to where they end. */
+  acceptSuggestionsHere(): void {
+    const suggested = this.suggestion?.ranges;
+    if (suggested === undefined || suggested.length === 0) {
+      this.say('No suggested sections for this item');
+      return;
+    }
+    const time = itemTimeOf(this.currentTime(), this.itemStart, this.length);
+    const taken = rangesFromHere(suggested, this.draft.ranges, time, MIN_RANGE_SECONDS);
+    let added = 0;
+    for (const range of taken) {
+      // Only labels drawn on the timeline: a refinement counts once its parent is on, which
+      // the parent's own range (taken earlier in this loop) may just have done.
+      const group = this.taxonomy?.groups.find((candidate) => candidate.id === range.group);
+      if (group === undefined || !isGroupActive(group, this.draft.values, this.draft.ranges)) {
+        continue;
+      }
+      this.edit((taxonomy, draft) => addRange(taxonomy, draft, range));
+      added += 1;
+    }
+    this.say(tookMessage(added));
+  }
+
   /** Shift+F: the open labels hold for the whole item instead of a range. */
   wholeItem(): void {
     if (this.openRanges.length === 0) {
@@ -726,6 +759,7 @@ export class LabelingSession {
       escape: () => this.cancelRange(),
       search: () => (this.searchOpen = true),
       wholeItem: () => this.wholeItem(),
+      acceptHere: () => this.acceptSuggestionsHere(),
     };
     simple[action.kind]?.();
     this.performWithArgument(action);

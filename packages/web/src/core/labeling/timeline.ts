@@ -104,6 +104,25 @@ export interface SuggestedRange extends Range {
 /** Suggested ranges below this score are not drawn. */
 export const GHOST_THRESHOLD = 0.3;
 
+/**
+ * S: every drawn suggestion under `time` (item seconds) becomes a range from `time` to the
+ * suggestion's end, unless that label already holds there or the rest is too short.
+ */
+export function rangesFromHere(suggested: SuggestedRange[], ranges: Range[], time: number, minSeconds: number): Range[] {
+  const taken: Range[] = [];
+  for (const ghost of suggested) {
+    if (ghost.score < GHOST_THRESHOLD || time < ghost.start || time >= ghost.end || ghost.end - time < minSeconds) {
+      continue;
+    }
+    const target = { group: ghost.group, label: ghost.label, start: time, end: ghost.end };
+    const held = [...ranges, ...taken].some((range) => range.group === ghost.group && range.label === ghost.label && range.start <= time && time < range.end);
+    if (!held) {
+      taken.push(target);
+    }
+  }
+  return taken;
+}
+
 /** One row of the timeline: a label that is on (for the whole item or in ranges), suggested, or armed. */
 export interface LabelTrack {
   group: Group;

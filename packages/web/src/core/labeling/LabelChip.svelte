@@ -64,16 +64,16 @@
 	onmousedown={(event) => event.preventDefault()}
 	title={tooltip}
 	aria-pressed={selected}
-	class="flex h-8 min-w-0 items-center gap-1.5 rounded-md border px-2 text-left text-[13px] transition-colors {look} {label.deprecated ? 'opacity-60' : ''}"
+	class="flex h-9 min-w-0 items-center gap-1.5 rounded-md border px-2.5 text-left text-sm transition-colors {look} {label.deprecated ? 'opacity-60' : ''}"
 >
 	{#if label.image}
 		<img src={label.image} alt="" loading="lazy" class="-ml-1 h-6 w-6 shrink-0 rounded object-cover" />
 	{/if}
 	<span class="min-w-0 flex-1 truncate">{label.name}</span>
-	{#if label.deprecated}<span class="text-[10px] uppercase opacity-60">old</span>{/if}
+	{#if label.deprecated}<span class="text-[11px] uppercase opacity-60">old</span>{/if}
 	{#if hasRange}<ClockIcon size={12} class={selected ? '' : 'text-violet'} />{/if}
 	{#if proposed}
-		<span class="font-mono text-[10px] tabular-nums {strong ? 'text-green' : 'text-faint'}">{percent}</span>
+		<span class="font-mono text-[11px] tabular-nums {strong ? 'text-green' : 'text-faint'}">{percent}</span>
 	{/if}
-	{#if badge}<span class="shrink-0 font-mono text-[10px] opacity-40">{badge}</span>{/if}
+	{#if badge}<span class="shrink-0 font-mono text-[11px] opacity-40">{badge}</span>{/if}
 </button>

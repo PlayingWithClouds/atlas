@@ -22,7 +22,7 @@
 </script>
 
 {#if assetEntries.length > 0 || itemEntries.length > 0}
-	<details class="text-xs">
+	<details class="text-sm">
 		<summary class="text-dim hover:text-default cursor-pointer select-none">Details</summary>
 		<dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
 			{#each [...assetEntries, ...itemEntries] as [key, value] (key + value)}
