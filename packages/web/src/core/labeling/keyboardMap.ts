@@ -36,6 +36,7 @@ export type LabelAction =
   | { kind: "neighbour"; offset: 1 | -1 }
   | { kind: "cheatSheet" }
   | { kind: "search" }
+  | { kind: "wholeItem" }
   | { kind: "escape" };
 
 export const SEEK_STEP_SECONDS = 2;
@@ -160,6 +161,10 @@ export function actionForKey(press: KeyPress, focusedLabels: KeyedLabel[]): Labe
   if (press.key.length !== 1) {
     return undefined;
   }
+  // Shift+F, not F: every free letter is some label's hotkey, and lowercase f stays one.
+  if (press.key === "F" && press.shiftKey) {
+    return { kind: "wholeItem" };
+  }
   const reserved = LETTER_KEYS[press.key.toLowerCase()];
   if (reserved !== undefined) {
     return reserved;
@@ -178,7 +183,9 @@ export interface KeyHelp {
 
 export const KEY_HELP: KeyHelp[] = [
   { keys: ["↑", "↓"], action: "Focus group (also Tab)", compact: true, short: "group" },
-  { keys: ["/"], action: "Search every label and toggle it", compact: true, short: "search" },
+  { keys: ["/"], action: "Search a label; Enter starts it at the playhead (again: drops it)", compact: true, short: "search" },
+  { keys: ["]"], action: "End every started label at the playhead", compact: true, short: "end" },
+  { keys: ["Shift", "F"], action: "Started labels hold for the whole scene instead", compact: true, short: "whole" },
   { keys: ["1-9"], action: "Toggle label of the focused group", compact: false },
   { keys: ["hotkey"], action: "Toggle the label with that hotkey", compact: false },
   { keys: ["Space"], action: "Play / pause", compact: true, short: "play" },
@@ -190,10 +197,10 @@ export const KEY_HELP: KeyHelp[] = [
   { keys: ["A"], action: "Accept suggestions of 50 % or more", compact: true, short: "accept" },
   { keys: ["C"], action: "Copy labels from the previous scene of this video", compact: false },
   { keys: ["Backspace"], action: "Delete the selected range, else clear the focused group", compact: false },
-  { keys: ["["], action: "Selected range (else the item) starts at the playhead", compact: false },
-  { keys: ["]"], action: "Selected range (else the item) ends at the playhead", compact: false },
+  { keys: ["["], action: "Started labels restart at the playhead; else the selected range (else the item) starts there", compact: false },
+  { keys: ["]"], action: "Without started labels: the selected range (else the item) ends at the playhead", compact: false },
   { keys: ["R"], action: "Start / end a range for the focused label", compact: false },
-  { keys: ["Esc"], action: "Deselect the range, stop looping it", compact: false },
+  { keys: ["Esc"], action: "Drop started labels, deselect the range, stop looping it", compact: false },
   { keys: ["drag"], action: "In a timeline track: mark the part of the item a label holds for", compact: false },
   { keys: ["drag"], action: "A bar or its edges: move or resize it (snaps to the playhead)", compact: false },
   { keys: ["dbl-click"], action: "A bar: loop just that part", compact: false },

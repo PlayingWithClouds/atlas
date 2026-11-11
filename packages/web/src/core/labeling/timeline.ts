@@ -130,6 +130,8 @@ export interface TrackInputs {
   ranges: Range[];
   suggested: SuggestedRange[];
   armed?: RangeTarget;
+  /** Labels started at the playhead and waiting for their end. */
+  open?: RangeTarget[];
 }
 
 function overlaps(first: Range, second: Range): boolean {
@@ -155,6 +157,13 @@ function ghostsOf(inputs: TrackInputs, group: Group, label: Label, ranges: Range
       ghost.score >= GHOST_THRESHOLD &&
       !ranges.some((range) => overlaps(range, ghost)),
   );
+}
+
+function isOpen(inputs: TrackInputs, group: Group, label: Label): boolean {
+  if (inputs.open === undefined) {
+    return false;
+  }
+  return inputs.open.some((target) => target.group === group.id && target.label === label.id);
 }
 
 function isArmed(inputs: TrackInputs, group: Group, label: Label): boolean {
@@ -210,7 +219,8 @@ function trackOf(inputs: TrackInputs, group: Group, label: Label, refines?: Rang
   const ranges = all.filter((range) => !isAbsorbed(inputs, range, refines));
   const ghosts = ghostsOf(inputs, group, label, all);
   const armed = isArmed(inputs, group, label);
-  if (!whole && ranges.length === 0 && ghosts.length === 0 && !armed) {
+  const open = isOpen(inputs, group, label);
+  if (!whole && ranges.length === 0 && ghosts.length === 0 && !armed && !open) {
     return undefined;
   }
   // A refinement set for the whole item is already noted on its parent's bars.

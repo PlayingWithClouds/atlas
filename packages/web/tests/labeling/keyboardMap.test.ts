@@ -44,6 +44,7 @@ describe('actionForKey', () => {
     expect(actionForKey(press('r'), labels)).toEqual({ kind: 'range' });
     expect(actionForKey(press('?', { shiftKey: true }), labels)).toEqual({ kind: 'cheatSheet' });
     expect(actionForKey(press('/'), labels)).toEqual({ kind: 'search' });
+    expect(actionForKey(press('F', { shiftKey: true }), labels)).toEqual({ kind: 'wholeItem' });
     expect(actionForKey(press('/', { shiftKey: true }), labels)).toEqual({ kind: 'search' });
   });
 

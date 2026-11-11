@@ -143,7 +143,7 @@
 							playhead={session.playhead}
 							frameRate={session.frameRate()}
 							tracks={session.tracks}
-							pending={session.pendingRange}
+							pending={session.openRanges}
 							itemStart={session.itemStart}
 							length={session.length}
 							selected={session.selectedRange}
