@@ -81,7 +81,7 @@
 	type Drag =
 		| { kind: 'scrub' }
 		| { kind: 'create'; target: RangeTarget; anchor: number; current: number; startX: number }
-		| { kind: 'edit'; range: Range; mode: RangeDragMode; origin: number; preview: Range; startX: number };
+		| { kind: 'edit'; range: Range; mode: RangeDragMode; origin: number; preview: Range; startX: number; snapTo: number };
 
 	let container = $state<HTMLElement>();
 	let ruler = $state<HTMLElement>();
@@ -119,6 +119,7 @@
 	$effect(() => {
 		void itemSpan.start;
 		void itemSpan.end;
+		wheelTarget = undefined;
 		view = undefined;
 	});
 
@@ -144,25 +145,73 @@
 		return () => element.removeEventListener('wheel', onWheel);
 	});
 
+	/** Where wheel input is heading; the view eases toward it so steps of a mouse wheel glide. */
+	let wheelTarget: TimelineWindow | undefined;
+	let wheelFrame: number | undefined;
+	let wheelClientX = 0;
+	const EASE_PER_FRAME = 0.35;
+
 	function onWheel(event: WheelEvent): void {
 		event.preventDefault();
-		const horizontal = event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY);
-		if (horizontal) {
-			view = panWindow(axis, bounds, panPixels(event) * secondsPerPixel);
-		} else {
-			view = zoomWindow(axis, bounds, zoomAnchor(), Math.exp(event.deltaY * 0.0015));
+		let from = axis;
+		if (wheelTarget !== undefined) {
+			from = wheelTarget;
 		}
-		// The pointer stays put while the axis moves under it.
-		if (hover !== undefined) {
-			hover = { ...hover, seconds: secondsAtClientX(event.clientX) };
+		const horizontal = event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY);
+		const targetSecondsPerPixel = (from.end - from.start) / Math.max(1, laneWidth);
+		if (horizontal) {
+			wheelTarget = panWindow(from, bounds, wheelPixels(event, panPixels(event)) * targetSecondsPerPixel);
+		} else {
+			const anchor = secondsAtFraction(from, pointerFraction(event.clientX));
+			wheelTarget = zoomWindow(from, bounds, anchor, Math.exp(wheelPixels(event, event.deltaY) * 0.0015));
+		}
+		wheelClientX = event.clientX;
+		if (wheelFrame === undefined) {
+			wheelFrame = requestAnimationFrame(easeTowardTarget);
 		}
 	}
 
-	function zoomAnchor(): number {
-		if (hover !== undefined) {
-			return hover.seconds;
+	function easeTowardTarget(): void {
+		wheelFrame = undefined;
+		const target = wheelTarget;
+		if (target === undefined) {
+			return;
 		}
-		return (axis.start + axis.end) / 2;
+		const width = target.end - target.start;
+		const done = Math.abs(axis.start - target.start) < width * 0.001 && Math.abs(axis.end - target.end) < width * 0.001;
+		if (done) {
+			view = target;
+			wheelTarget = undefined;
+		} else {
+			view = {
+				start: axis.start + (target.start - axis.start) * EASE_PER_FRAME,
+				end: axis.end + (target.end - axis.end) * EASE_PER_FRAME
+			};
+			wheelFrame = requestAnimationFrame(easeTowardTarget);
+		}
+		// The pointer stays put while the axis moves under it.
+		if (hover !== undefined) {
+			hover = { ...hover, seconds: secondsAtClientX(wheelClientX) };
+		}
+	}
+
+	/** Line- and page-based wheels (Firefox) report steps, not pixels. */
+	function wheelPixels(event: WheelEvent, delta: number): number {
+		if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+			return delta * 16;
+		}
+		if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+			return delta * laneWidth;
+		}
+		return delta;
+	}
+
+	function pointerFraction(clientX: number): number {
+		if (ruler === undefined) {
+			return 0.5;
+		}
+		const box = ruler.getBoundingClientRect();
+		return Math.min(1, Math.max(0, (clientX - box.left) / box.width));
 	}
 
 	/** Mice send Shift+wheel as vertical delta, trackpads swipe horizontally. */
@@ -174,10 +223,12 @@
 	}
 
 	function zoomBy(factor: number): void {
+		wheelTarget = undefined;
 		view = zoomWindow(axis, bounds, playhead, factor);
 	}
 
 	function fit(): void {
+		wheelTarget = undefined;
 		view = undefined;
 	}
 
@@ -191,8 +242,12 @@
 		return secondsAtFraction(axis, (clientX - box.left) / box.width);
 	}
 
-	function snapped(seconds: number): number {
-		return snapTime(seconds, playhead, SNAP_PIXELS * secondsPerPixel, frameRate);
+	/**
+	 * Snaps to frames, and to `anchor` when close. Edge drags pass the playhead from before they
+	 * started: they seek the playhead along, and snapping to that would pin the edge in place.
+	 */
+	function snapped(seconds: number, anchor = playhead): number {
+		return snapTime(seconds, anchor, SNAP_PIXELS * secondsPerPixel, frameRate);
 	}
 
 	function left(seconds: number): number {
@@ -293,7 +348,7 @@
 		event.preventDefault();
 		event.stopPropagation();
 		const origin = secondsAtClientX(event.clientX);
-		drag = { kind: 'edit', range, mode, origin, preview: range, startX: event.clientX };
+		drag = { kind: 'edit', range, mode, origin, preview: range, startX: event.clientX, snapTo: playhead };
 		follow(
 			(move) => moveEdit(move, range, mode, origin),
 			(up) => finishEdit(up, range)
@@ -305,26 +360,38 @@
 			return;
 		}
 		const preview = draggedRange(range, mode, secondsAtClientX(event.clientX) - origin, length);
-		const snappedPreview = snapEdges(preview, mode);
+		const snappedPreview = snapEdges(preview, mode, drag.snapTo);
 		drag = { ...drag, preview: snappedPreview };
 		seekToEdge(snappedPreview, mode);
 	}
 
 	/** Snaps the edge being dragged (both edges keep their distance when moving the bar). */
-	function snapEdges(range: Range, mode: RangeDragMode): Range {
+	function snapEdges(range: Range, mode: RangeDragMode, anchor: number): Range {
 		if (mode === 'end') {
-			return draggedRange(range, 'end', snapped(itemStart + range.end) - itemStart - range.end, length);
+			return draggedRange(range, 'end', snapped(itemStart + range.end, anchor) - itemStart - range.end, length);
 		}
-		return draggedRange(range, mode, snapped(itemStart + range.start) - itemStart - range.start, length);
+		return draggedRange(range, mode, snapped(itemStart + range.start, anchor) - itemStart - range.start, length);
 	}
 
-	// Shows the frame under the edge being dragged, so it can be placed exactly.
+	let pendingSeek: number | undefined;
+
+	// Shows the frame under the edge being dragged, so it can be placed exactly; one seek per
+	// animation frame, however fast the pointer moves.
 	function seekToEdge(range: Range, mode: RangeDragMode): void {
+		const wasQueued = pendingSeek !== undefined;
+		pendingSeek = itemStart + range.start;
 		if (mode === 'end') {
-			onseek(itemStart + range.end);
+			pendingSeek = itemStart + range.end;
+		}
+		if (wasQueued) {
 			return;
 		}
-		onseek(itemStart + range.start);
+		requestAnimationFrame(() => {
+			if (pendingSeek !== undefined) {
+				onseek(pendingSeek);
+			}
+			pendingSeek = undefined;
+		});
 	}
 
 	function finishEdit(event: PointerEvent, range: Range): void {
@@ -341,6 +408,10 @@
 	}
 
 	// --- drawing helpers -------------------------------------------------------------------
+
+	function isDragging(range: Range): boolean {
+		return drag !== undefined && drag.kind === 'edit' && drag.range === range;
+	}
 
 	function shownRange(range: Range): Range {
 		if (drag !== undefined && drag.kind === 'edit' && drag.range === range) {
@@ -512,22 +583,32 @@
 				{#each track.ranges as range, index (range)}
 					{@const shown = shownRange(range)}
 					{@const note = track.rangeNotes[index]}
+					{@const active = range === selected || isDragging(range)}
 					<div
 						role="button"
 						tabindex="-1"
 						title="{describe(shown)}. Drag to move, edges to resize, double-click to loop it."
 						onpointerdown={(event) => startEdit(event, range, 'move')}
 						ondblclick={() => onloop(range)}
-						class="absolute inset-y-0 cursor-grab overflow-hidden rounded-sm {barClass(range)}"
+						class="group/bar absolute inset-y-0 cursor-grab rounded-sm {barClass(range)}"
 						style="left: {left(itemStart + shown.start)}%; width: {widthBetween(itemStart + shown.start, itemStart + shown.end)}%"
 					>
-						<span class="pointer-events-none flex h-full items-center gap-1 px-1.5 text-xs whitespace-nowrap text-white">
+						<span class="pointer-events-none flex h-full items-center gap-1 overflow-hidden px-2 text-xs whitespace-nowrap text-white">
 							<span class="font-medium">{track.label.name}</span>
 							{#if note}<span class="text-white/80">· {note}</span>{/if}
 							<span class="opacity-60">{formatClock(shown.end - shown.start, 1)}</span>
 						</span>
-						<div role="presentation" class="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize bg-white/0 hover:bg-white/50" onpointerdown={(event) => startEdit(event, range, 'start')}></div>
-						<div role="presentation" class="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize bg-white/0 hover:bg-white/50" onpointerdown={(event) => startEdit(event, range, 'end')}></div>
+						<!-- Edge handles reach a few pixels past the bar, so short bars stay resizable. -->
+						<div role="presentation" class="absolute inset-y-0 -left-1.5 z-10 flex w-3 cursor-ew-resize justify-center" onpointerdown={(event) => startEdit(event, range, 'start')}>
+							<span class="my-1 w-1 rounded-full {active ? 'bg-white' : 'bg-white/0 group-hover/bar:bg-white/60'}"></span>
+						</div>
+						<div role="presentation" class="absolute inset-y-0 -right-1.5 z-10 flex w-3 cursor-ew-resize justify-center" onpointerdown={(event) => startEdit(event, range, 'end')}>
+							<span class="my-1 w-1 rounded-full {active ? 'bg-white' : 'bg-white/0 group-hover/bar:bg-white/60'}"></span>
+						</div>
+						{#if active}
+							<span class="edge-time right-full mr-1.5">{formatClock(itemStart + shown.start, 2)}</span>
+							<span class="edge-time left-full ml-1.5">{formatClock(itemStart + shown.end, 2)}</span>
+						{/if}
 					</div>
 				{/each}
 
@@ -594,3 +675,21 @@
 		{/if}
 	</div>
 </div>
+
+<style>
+	.edge-time {
+		pointer-events: none;
+		position: absolute;
+		top: 50%;
+		z-index: 30;
+		transform: translateY(-50%);
+		border-radius: 0.25rem;
+		background: rgb(0 0 0 / 0.8);
+		padding: 0.0625rem 0.25rem;
+		font-family: var(--font-mono, ui-monospace, monospace);
+		font-size: 10px;
+		font-variant-numeric: tabular-nums;
+		color: white;
+		white-space: nowrap;
+	}
+</style>
