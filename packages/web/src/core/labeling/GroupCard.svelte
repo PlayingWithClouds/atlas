@@ -124,12 +124,12 @@
 		class="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left"
 		aria-expanded={expanded}
 	>
-		<span class="text-faint shrink-0">
+		<span class="text-dim shrink-0">
 			{#if expanded}<CaretDownIcon size={12} />{:else}<CaretRightIcon size={12} />{/if}
 		</span>
 		<span class="text-default shrink-0 text-[15px] font-semibold">{group.label}</span>
 		{#if expanded}
-			<span class="text-faint flex-1 text-xs">{kindHint(group)}</span>
+			<span class="text-muted flex-1 text-xs">{kindHint(group)}</span>
 		{:else}
 			<span class="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
 				{#each summary as entry (entry.id)}
@@ -141,7 +141,7 @@
 					<span class="border-green/60 text-muted shrink-0 rounded border border-dashed px-1.5 py-0.5 text-sm">{entry.label.name} {Math.round(Number(entry.probability) * 100)}%</span>
 				{/each}
 				{#if summary.length === 0 && proposals.length === 0}
-					<span class="text-faint text-sm">{#if reviewed}none{:else}unknown{/if}</span>
+					<span class="text-muted text-sm">{#if reviewed}none{:else}unknown{/if}</span>
 				{/if}
 			</span>
 		{/if}
@@ -160,14 +160,14 @@
 					<div class="mb-1.5 flex items-center gap-2 text-sm">
 						<span class="text-violet">↳ {parentLabelName(refinement)}</span>
 						<span class="font-semibold {focusedHere ? 'text-default' : 'text-muted'}">{refinement.label}</span>
-						<span class="text-faint flex-1 text-xs">{kindHint(refinement)}</span>
+						<span class="text-muted flex-1 text-xs">{kindHint(refinement)}</span>
 					{#if refinementUncertainty !== undefined}<UncertaintyMeter uncertainty={refinementUncertainty} />{/if}
 					</div>
 					<LabelGrid group={refinement} {draft} {suggestion} columns={columnsFor(refinement)} ontoggle={(labelId) => ontoggle(refinement, labelId)} />
 				</div>
 			{/each}
 
-			<label class="text-dim flex items-center gap-1.5 self-end text-xs {holdsLabels ? 'opacity-40' : ''}" title="Reviewed groups tell trainers 'none of these'; unreviewed ones stay unknown (U)">
+			<label class="text-muted flex items-center gap-1.5 self-end text-xs {holdsLabels ? 'opacity-40' : ''}" title="Reviewed groups tell trainers 'none of these'; unreviewed ones stay unknown (U)">
 				<input type="checkbox" class="toggle toggle-xs" checked={reviewed} disabled={holdsLabels} onchange={(event) => onreviewed(group.id, event.currentTarget.checked)} />
 				reviewed
 			</label>

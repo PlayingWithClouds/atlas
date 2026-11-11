@@ -5,6 +5,7 @@
 	import GroupCard from './GroupCard.svelte';
 	import LabelSearch from './LabelSearch.svelte';
 	import { formatClock } from '../shared/time';
+	import { settings } from '../settings/settings.svelte';
 	import CaretDownIcon from 'phosphor-svelte/lib/CaretDown';
 	import CaretRightIcon from 'phosphor-svelte/lib/CaretRight';
 	import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlass';
@@ -70,7 +71,7 @@
 				{#each session.openRanges as open (open.group + '.' + open.label)}
 					<span class="bg-violet/25 text-default rounded px-1.5 py-0.5">{labelName(open.group, open.label)}</span>
 				{/each}
-				<span class="text-faint ml-auto"><kbd class="font-mono">]</kbd> end · <kbd class="font-mono">⇧F</kbd> whole · <kbd class="font-mono">Esc</kbd> drop</span>
+				<span class="text-muted ml-auto"><kbd class="font-mono">]</kbd> end · <kbd class="font-mono">{settings.value.leader} f</kbd> whole · <kbd class="font-mono">Esc</kbd> drop</span>
 			</div>
 		{/if}
 	</div>
@@ -86,11 +87,11 @@
 			onmousedown={(event) => event.preventDefault()}
 			onclick={() => session.toggleMore()}
 			class="text-dim hover:text-default border-line-faint flex items-center gap-1.5 border-b px-3 py-2 text-left text-sm font-medium"
-			title="Groups behind More count as reviewed while open, unknown while closed (G)"
+			title="Groups behind More count as reviewed while open, unknown while closed"
 		>
 			{#if session.draft.moreExpanded}<CaretDownIcon size={12} />{:else}<CaretRightIcon size={12} />{/if}
 			More groups ({moreCount})
-			<span class="text-faint font-normal">{#if session.draft.moreExpanded}reviewed{:else}unknown{/if}</span>
+			<span class="text-muted font-normal">{#if session.draft.moreExpanded}reviewed{:else}unknown{/if}</span>
 		</button>
 		{#if session.draft.moreExpanded}
 			{#each session.layout.more as group (group.id)}
