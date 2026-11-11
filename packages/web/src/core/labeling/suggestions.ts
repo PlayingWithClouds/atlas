@@ -49,7 +49,7 @@ function proposedLabelIds(group: Group, suggestion: Suggestion, threshold: numbe
 }
 
 function isOpenToProposals(group: Group, draft: Draft): boolean {
-  if (!isGroupActive(group, draft.values)) {
+  if (!isGroupActive(group, draft.values, draft.ranges)) {
     return false;
   }
   if (group.primary !== true && !draft.moreExpanded) {

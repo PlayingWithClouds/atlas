@@ -96,6 +96,8 @@ export function parseAsset(raw: unknown): Parsed<Asset> {
     url: raw.url as string,
     poster: optionalText(raw, "poster", problems),
     duration: optionalNumber(raw, "duration", problems),
+    frameRate: optionalNumber(raw, "frameRate", problems),
+    thumbnails: optionalText(raw, "thumbnails", problems),
     width: optionalNumber(raw, "width", problems),
     height: optionalNumber(raw, "height", problems),
     title: optionalText(raw, "title", problems),

@@ -23,6 +23,14 @@ describe('actionForKey', () => {
     expect(actionForKey(press('ArrowRight', { shiftKey: true }), labels)).toEqual({ kind: 'neighbour', offset: 1 });
   });
 
+  test('comma and period step frames, ten with Shift', () => {
+    expect(actionForKey(press(','), labels)).toEqual({ kind: 'stepFrames', count: -1 });
+    expect(actionForKey(press('.'), labels)).toEqual({ kind: 'stepFrames', count: 1 });
+    expect(actionForKey(press(',', { shiftKey: true }), labels)).toEqual({ kind: 'stepFrames', count: -10 });
+    expect(actionForKey(press('>', { shiftKey: true }), labels)).toEqual({ kind: 'stepFrames', count: 10 });
+    expect(isReservedHotkey('.')).toBe(true);
+  });
+
   test('the item actions', () => {
     expect(actionForKey(press(' '), labels)).toEqual({ kind: 'togglePlay' });
     expect(actionForKey(press('Enter'), labels)).toEqual({ kind: 'save' });

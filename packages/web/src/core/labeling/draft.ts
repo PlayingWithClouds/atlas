@@ -61,7 +61,7 @@ export interface GroupLayout {
 export function layoutGroups(taxonomy: Taxonomy, draft: Draft): GroupLayout {
   const layout: GroupLayout = { primary: [], more: [] };
   for (const group of taxonomy.groups) {
-    if (!isGroupActive(group, draft.values) || hasNothingToAsk(group, draft)) {
+    if (!isGroupActive(group, draft.values, draft.ranges) || hasNothingToAsk(group, draft)) {
       continue;
     }
     if (group.primary === true) {
@@ -90,7 +90,7 @@ export function focusableGroups(taxonomy: Taxonomy, draft: Draft): Group[] {
  * unknown; a group with an unmet condition is never reviewed.
  */
 export function isReviewed(group: Group, draft: Draft): boolean {
-  if (!isGroupActive(group, draft.values)) {
+  if (!isGroupActive(group, draft.values, draft.ranges)) {
     return false;
   }
   if (hasLabels(draft, group.id)) {
@@ -110,7 +110,7 @@ export function reviewedGroupIds(taxonomy: Taxonomy, draft: Draft): string[] {
 
 /** Removes everything that belongs to groups whose condition is no longer met. */
 export function pruneInactive(taxonomy: Taxonomy, draft: Draft): Draft {
-  const inactiveIds = taxonomy.groups.filter((group) => !isGroupActive(group, draft.values)).map((group) => group.id);
+  const inactiveIds = taxonomy.groups.filter((group) => !isGroupActive(group, draft.values, draft.ranges)).map((group) => group.id);
   if (inactiveIds.length === 0) {
     return draft;
   }
@@ -205,7 +205,7 @@ function rangesOfAnnotation(annotation: Annotation): Range[] {
 }
 
 function isOnScreenAtLoad(group: Group, annotation: Annotation, moreExpanded: boolean): boolean {
-  if (!isGroupActive(group, annotation.values)) {
+  if (!isGroupActive(group, annotation.values, rangesOfAnnotation(annotation))) {
     return false;
   }
   return group.primary === true || moreExpanded;

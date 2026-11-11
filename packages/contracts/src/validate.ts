@@ -94,15 +94,17 @@ function allIds(taxonomy: Pick<Taxonomy, "groups">): string[] {
 // --- conditions --------------------------------------------------------------------------
 
 /** Whether a group is asked, given the labels that hold for the whole item. */
-export function isGroupActive(group: Group, values: Record<string, string[]>): boolean {
-  if (group.when === undefined) {
+/** Whether a group is asked: no condition, or its condition label is on for the whole item or in a range. */
+export function isGroupActive(group: Group, values: Record<string, string[]>, ranges: Range[] = []): boolean {
+  const condition = group.when;
+  if (condition === undefined) {
     return true;
   }
-  const chosen = values[group.when.group];
-  if (chosen === undefined) {
-    return false;
+  const chosen = values[condition.group];
+  if (chosen !== undefined && chosen.includes(condition.label)) {
+    return true;
   }
-  return chosen.includes(group.when.label);
+  return ranges.some((range) => range.group === condition.group && range.label === condition.label);
 }
 
 // --- annotations -------------------------------------------------------------------------
@@ -221,7 +223,7 @@ function validateReviewed(taxonomy: Taxonomy, input: AnnotationInput): string[] 
       problems.push(`reviewed lists unknown group "${groupId}"`);
       continue;
     }
-    if (!isGroupActive(group, input.values)) {
+    if (!isGroupActive(group, input.values, rangesOf(input))) {
       problems.push(`group "${groupId}" is reviewed but its condition is not met`);
     }
   }
@@ -238,7 +240,7 @@ function validateInactiveGroup(group: Group, input: AnnotationInput): string[] {
   if (!hasValues && !hasRanges) {
     return [];
   }
-  if (!isGroupActive(group, input.values)) {
+  if (!isGroupActive(group, input.values, rangesOf(input))) {
     return [`group "${group.id}" has labels but its condition is not met`];
   }
   if (!input.reviewed.includes(group.id)) {
