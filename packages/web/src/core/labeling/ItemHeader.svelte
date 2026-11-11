@@ -34,7 +34,7 @@
 		<ArrowLeftIcon size={15} />
 	</button>
 	<div class="min-w-0">
-		<div class="text-default truncate text-[15px] font-semibold" {title}>{title}</div>
+		<div class="text-default truncate text-[length:calc(15px*var(--text-scale))] font-semibold" {title}>{title}</div>
 		<div class="text-dim flex items-center gap-2 font-mono text-xs">
 			{#if detail.item.span}<span>{formatSpan(detail.item.span)}</span>{/if}
 			{#if detail.asset.duration !== undefined}<span>of {formatClock(detail.asset.duration)}</span>{/if}

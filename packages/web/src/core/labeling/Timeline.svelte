@@ -597,7 +597,7 @@
 							onpointerdown={(event) => event.stopPropagation()}
 							onclick={() => onaccept(ghost)}
 							title="Suggested ({Math.round(ghost.score * 100)} %): click to take it"
-							class="border-violet text-violet hover:bg-violet/20 absolute inset-y-0.5 overflow-hidden rounded-sm border border-dashed px-1 text-left text-[11px] leading-4 whitespace-nowrap"
+							class="border-violet text-violet hover:bg-violet/20 absolute inset-y-0.5 overflow-hidden rounded-sm border border-dashed px-1 text-left text-2xs leading-4 whitespace-nowrap"
 							style="left: {left(itemStart + ghost.start)}%; width: {widthBetween(itemStart + ghost.start, itemStart + ghost.end)}%"
 						>
 							{Math.round(ghost.score * 100)} %
@@ -730,7 +730,7 @@
 		background: rgb(0 0 0 / 0.8);
 		padding: 0.0625rem 0.25rem;
 		font-family: var(--font-mono, ui-monospace, monospace);
-		font-size: 11px;
+		font-size: calc(11px * var(--text-scale));
 		font-variant-numeric: tabular-nums;
 		color: white;
 		white-space: nowrap;

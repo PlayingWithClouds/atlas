@@ -127,7 +127,7 @@
 		<span class="text-dim shrink-0">
 			{#if expanded}<CaretDownIcon size={12} />{:else}<CaretRightIcon size={12} />{/if}
 		</span>
-		<span class="text-default shrink-0 text-[15px] font-semibold">{group.label}</span>
+		<span class="text-default shrink-0 text-[length:calc(15px*var(--text-scale))] font-semibold">{group.label}</span>
 		{#if expanded}
 			<span class="text-muted flex-1 text-xs">{kindHint(group)}</span>
 		{:else}

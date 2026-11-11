@@ -178,7 +178,7 @@
 						<button
 							type="button"
 							title="Click to reassign hotkey"
-							class="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] {rebindingId === command.id
+							class="shrink-0 rounded px-1.5 py-0.5 font-mono text-[length:calc(10px*var(--text-scale))] {rebindingId === command.id
 								? 'bg-primary text-primary-content'
 								: 'bg-base-100 text-dim hover:bg-hover'}"
 							onclick={(event) => {
@@ -193,7 +193,7 @@
 					<div class="text-faint px-3 py-6 text-center text-sm">No commands</div>
 				{/each}
 			</div>
-			<div class="border-line text-faint border-t px-3 py-1.5 text-[11px]">
+			<div class="border-line text-faint border-t px-3 py-1.5 text-2xs">
 				Summon with <span class="bg-base-100 rounded px-1 font-mono">F1</span> or
 				<span class="bg-base-100 rounded px-1 font-mono">{settings.value.commandMenu}</span> · click a hotkey to reassign
 			</div>

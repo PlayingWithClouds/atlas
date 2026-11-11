@@ -226,8 +226,8 @@
 		<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square text-white" onmousedown={(event) => event.preventDefault()} onclick={togglePlay} aria-label="Play or pause">
 			{#if paused}<PlayIcon size={14} weight="fill" />{:else}<PauseIcon size={14} weight="fill" />{/if}
 		</button>
-		<span class="font-mono text-[11px] tabular-nums">{formatTime(playhead)}</span>
-		<span class="font-mono text-[11px] text-white/60 tabular-nums" title="Frame at {frameRate} fps (, and . step one frame)">f{frameIndexAt(playhead, frameRate)}</span>
+		<span class="font-mono text-2xs tabular-nums">{formatTime(playhead)}</span>
+		<span class="font-mono text-2xs text-white/60 tabular-nums" title="Frame at {frameRate} fps (, and . step one frame)">f{frameIndexAt(playhead, frameRate)}</span>
 		<span class="flex-1"></span>
 		<button
 			type="button"

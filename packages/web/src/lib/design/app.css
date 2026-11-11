@@ -251,17 +251,19 @@
 	--font-sans: 'Geist Variable', 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 	--font-mono: 'Geist Mono', ui-monospace, 'SF Mono', 'Roboto Mono', monospace;
 
-	--text-2xs: 11px;
-	--text-xs: 12px;
-	--text-sm: 13px;
-	--text-base: 14px;
-	--text-md: 16px;
-	--text-lg: 18px;
-	--text-xl: 20px;
-	--text-2xl: 24px;
-	--text-3xl: 30px;
-	--text-4xl: 36px;
-	--text-display: 48px;
+	/* Text size setting (per browser): every font size and the rem unit scale with it. */
+	--text-scale: 1;
+	--text-2xs: calc(11px * var(--text-scale));
+	--text-xs: calc(12px * var(--text-scale));
+	--text-sm: calc(13px * var(--text-scale));
+	--text-base: calc(14px * var(--text-scale));
+	--text-md: calc(16px * var(--text-scale));
+	--text-lg: calc(18px * var(--text-scale));
+	--text-xl: calc(20px * var(--text-scale));
+	--text-2xl: calc(24px * var(--text-scale));
+	--text-3xl: calc(30px * var(--text-scale));
+	--text-4xl: calc(36px * var(--text-scale));
+	--text-display: calc(48px * var(--text-scale));
 
 	--leading-tight: 1.1;
 	--leading-snug: 1.3;
@@ -441,7 +443,7 @@
 
 @layer base {
 	html {
-		font-size: 14px;
+		font-size: calc(14px * var(--text-scale));
 		scroll-behavior: smooth;
 		-webkit-font-smoothing: antialiased;
 		-moz-osx-font-smoothing: grayscale;
@@ -896,7 +898,7 @@
 	.badge-sm {
 		height: 16px;
 		padding-inline: 6px;
-		font-size: 10px;
+		font-size: calc(10px * var(--text-scale));
 	}
 	.badge-ghost {
 		background: transparent;

@@ -43,7 +43,7 @@
 		<div class="min-w-0 flex-1">
 			<div class="text-default truncate text-sm font-semibold">{currentName}</div>
 			{#if current}
-				<div class="text-faint text-[10px]">{pendingCount} pending · {current.labeled} labeled</div>
+				<div class="text-faint text-[length:calc(10px*var(--text-scale))]">{pendingCount} pending · {current.labeled} labeled</div>
 			{/if}
 		</div>
 		<CaretUpDownIcon size={14} class="text-dim" />

@@ -4,4 +4,4 @@
 	let { label }: { label: string } = $props();
 </script>
 
-<span class="ml-1 rounded border border-current/30 px-1 font-mono text-[10px] opacity-60">{label}</span>
+<span class="ml-1 rounded border border-current/30 px-1 font-mono text-[length:calc(10px*var(--text-scale))] opacity-60">{label}</span>

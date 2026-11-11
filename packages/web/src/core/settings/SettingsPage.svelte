@@ -7,7 +7,9 @@
 	import PageHeader from '../shared/PageHeader.svelte';
 	import { COMMANDS, LEADER_PREFIX, chordToRecord, conflictsOf, displayChord, isModifierKey, normalizeChord } from '../labeling/keyboardMap';
 	import type { Settings } from './settings.svelte';
-	import { DEFAULT_SETTINGS, settings } from './settings.svelte';
+	import { DEFAULT_SETTINGS, TEXT_SCALE_MAX, TEXT_SCALE_MIN, settings } from './settings.svelte';
+
+	const TEXT_PRESETS = [0.9, 1, 1.15, 1.3, 1.5];
 
 	// Routes pass the project; settings are the same for every project.
 	let { params: _params }: { params: Record<string, string> } = $props();
@@ -160,8 +162,31 @@
 	{/snippet}
 
 	<section class="border-line mb-6 rounded-lg border">
+		<h2 class="border-line text-default border-b px-4 py-3 text-base font-semibold">Display <span class="text-dim text-sm font-normal">· this browser only</span></h2>
+		<div class="flex flex-wrap items-center gap-4 px-4 py-3 text-[length:calc(15px*var(--text-scale))]">
+			<label class="text-default" for="text-scale">Text size</label>
+			<input
+				id="text-scale"
+				type="range"
+				class="w-56 accent-current"
+				min={TEXT_SCALE_MIN}
+				max={TEXT_SCALE_MAX}
+				step="0.05"
+				value={settings.textScale}
+				oninput={(event) => settings.setTextScale(Number(event.currentTarget.value))}
+			/>
+			<span class="text-default w-12 font-mono tabular-nums">{Math.round(settings.textScale * 100)}%</span>
+			<div class="flex gap-1">
+				{#each TEXT_PRESETS as preset (preset)}
+					<button type="button" class="btn btn-xs {settings.textScale === preset ? 'btn-primary' : 'btn-ghost border-line'}" onclick={() => settings.setTextScale(preset)}>{Math.round(preset * 100)}%</button>
+				{/each}
+			</div>
+		</div>
+	</section>
+
+	<section class="border-line mb-6 rounded-lg border">
 		<h2 class="border-line text-default border-b px-4 py-3 text-base font-semibold">Keys</h2>
-		<div class="border-line grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-3 border-b px-4 py-3 text-[15px]">
+		<div class="border-line grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-3 border-b px-4 py-3 text-[length:calc(15px*var(--text-scale))]">
 			<div>
 				<div class="text-default">Leader key</div>
 				<div class="text-dim text-sm">Starts sequences like leader then F. Space stops working as play / pause if you pick it.</div>
@@ -180,7 +205,7 @@
 			</div>
 		</div>
 
-		<table class="w-full text-[15px]">
+		<table class="w-full text-[length:calc(15px*var(--text-scale))]">
 			<tbody>
 				{#each COMMANDS as command (command.id)}
 					<tr class="border-line-faint border-b last:border-b-0">
@@ -219,7 +244,7 @@
 
 	<section class="border-line mb-6 rounded-lg border">
 		<h2 class="border-line text-default border-b px-4 py-3 text-base font-semibold">Playback and timeline</h2>
-		<div class="grid grid-cols-[1fr_8rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-[15px]">
+		<div class="grid grid-cols-[1fr_8rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-[length:calc(15px*var(--text-scale))]">
 			<label class="text-default" for="seek-seconds">Seek step <span class="text-dim text-sm">(seconds, ← →)</span></label>
 			<input id="seek-seconds" class="input input-sm" type="number" min="0.1" step="0.1" value={settings.value.seekSeconds} onchange={(event) => setNumber('seekSeconds', event.currentTarget.value, 0.1)} />
 			<label class="text-default" for="frame-jump">Frame jump <span class="text-dim text-sm">(frames, Shift , .)</span></label>
@@ -233,7 +258,7 @@
 
 	<section class="border-line rounded-lg border">
 		<h2 class="border-line text-default border-b px-4 py-3 text-base font-semibold">Labeling panel</h2>
-		<label class="flex items-center gap-3 px-4 py-3 text-[15px]">
+		<label class="flex items-center gap-3 px-4 py-3 text-[length:calc(15px*var(--text-scale))]">
 			<input type="checkbox" class="toggle toggle-sm" checked={settings.value.expandMoreGroups} onchange={(event) => settings.update({ expandMoreGroups: event.currentTarget.checked })} />
 			<span class="text-default">Open "More groups" on every item</span>
 			<span class="text-dim text-sm">Open groups count as reviewed ("none of these") unless marked not reviewed.</span>

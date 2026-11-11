@@ -83,11 +83,11 @@
 			bind:value={query}
 			onkeydown={onKeydown}
 			onblur={close}
-			class="text-default placeholder:text-faint h-10 min-w-0 flex-1 border-0 bg-transparent text-[15px] outline-none focus:ring-0"
+			class="text-default placeholder:text-faint h-10 min-w-0 flex-1 border-0 bg-transparent text-[length:calc(15px*var(--text-scale))] outline-none focus:ring-0"
 			placeholder="Search labels…"
 			aria-label="Search labels"
 		/>
-		<kbd class="text-faint font-mono text-[11px]">Esc</kbd>
+		<kbd class="text-faint font-mono text-2xs">Esc</kbd>
 	</div>
 
 	{#if matches.length > 0}
@@ -100,7 +100,7 @@
 						onmousedown={(event) => event.preventDefault()}
 						onclick={() => pick(match)}
 						onmouseenter={() => (highlighted = index)}
-						class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[15px] {index === highlighted ? 'bg-hover text-default' : 'text-muted'}"
+						class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[length:calc(15px*var(--text-scale))] {index === highlighted ? 'bg-hover text-default' : 'text-muted'}"
 					>
 						<span class="flex w-3.5 shrink-0 justify-center">
 							{#if session.isOpenRange(match.group.id, match.label.id)}

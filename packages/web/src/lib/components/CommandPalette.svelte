@@ -65,7 +65,7 @@
 						onmousemove={() => (selectedIndex = index)}
 						class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm {index === selectedIndex ? 'bg-hover text-default' : 'text-muted'}"
 					>
-						<span class="text-faint w-16 text-[10px] font-semibold tracking-wider uppercase">{command.group}</span>
+						<span class="text-faint w-16 text-[length:calc(10px*var(--text-scale))] font-semibold tracking-wider uppercase">{command.group}</span>
 						<span class="flex-1">{command.label}</span>
 					</button>
 				{:else}

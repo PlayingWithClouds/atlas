@@ -69,7 +69,7 @@
 					</div>
 					<div class="w-40 shrink-0">
 						<ProgressBar labeled={project.labeled} skipped={project.skipped} total={project.items} />
-						<div class="text-faint mt-1 text-right text-[11px]">
+						<div class="text-faint mt-1 text-right text-2xs">
 							{project.labeled + project.skipped} / {project.items} done
 						</div>
 					</div>

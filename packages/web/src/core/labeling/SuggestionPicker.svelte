@@ -92,7 +92,7 @@
 					>
 						<input type="checkbox" tabindex="-1" class="checkbox checkbox-sm pointer-events-none" checked={ticked[index]} />
 						<span class="min-w-0 flex-1">
-							<span class="text-default block truncate text-[15px] font-medium">{name.label}</span>
+							<span class="text-default block truncate text-[length:calc(15px*var(--text-scale))] font-medium">{name.label}</span>
 							<span class="text-dim block truncate text-sm">{name.group}</span>
 						</span>
 						<span class="text-muted shrink-0 font-mono text-sm tabular-nums">→ {formatClock(session.itemStart + range.end, 1)}</span>
