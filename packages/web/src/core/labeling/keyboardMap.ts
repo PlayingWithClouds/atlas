@@ -35,6 +35,7 @@ export type LabelAction =
   | { kind: "toggleReviewed" }
   | { kind: "neighbour"; offset: 1 | -1 }
   | { kind: "cheatSheet" }
+  | { kind: "search" }
   | { kind: "escape" };
 
 export const SEEK_STEP_SECONDS = 2;
@@ -42,7 +43,7 @@ export const SEEK_STEP_SECONDS = 2;
 export const FRAME_JUMP = 10;
 
 /** Keys the screen uses itself; a label hotkey on one of these is only reachable by its digit. */
-export const RESERVED_KEYS = ["a", "s", "c", "r", "m", "g", "u", " ", "[", "]", "?", ",", ".", "<", ">"];
+export const RESERVED_KEYS = ["a", "s", "c", "r", "m", "g", "u", " ", "[", "]", "?", "/", ",", ".", "<", ">"];
 
 export function isReservedHotkey(hotkey: string): boolean {
   return RESERVED_KEYS.includes(hotkey.toLowerCase()) || (hotkey >= "1" && hotkey <= "9");
@@ -73,6 +74,7 @@ const LETTER_KEYS: Record<string, LabelAction> = {
   "[": { kind: "trimStart" },
   "]": { kind: "trimEnd" },
   "?": { kind: "cheatSheet" },
+  "/": { kind: "search" },
 };
 
 function directionOf(key: string): 1 | -1 {
@@ -176,6 +178,7 @@ export interface KeyHelp {
 
 export const KEY_HELP: KeyHelp[] = [
   { keys: ["↑", "↓"], action: "Focus group (also Tab)", compact: true, short: "group" },
+  { keys: ["/"], action: "Search every label and toggle it", compact: true, short: "search" },
   { keys: ["1-9"], action: "Toggle label of the focused group", compact: false },
   { keys: ["hotkey"], action: "Toggle the label with that hotkey", compact: false },
   { keys: ["Space"], action: "Play / pause", compact: true, short: "play" },

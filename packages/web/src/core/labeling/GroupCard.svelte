@@ -35,7 +35,9 @@
 
 	let element = $state<HTMLElement>();
 
-	const expanded = $derived(focusedGroupId === group.id || refinements.some((refinement) => refinement.id === focusedGroupId));
+	const focused = $derived(focusedGroupId === group.id || refinements.some((refinement) => refinement.id === focusedGroupId));
+	// Multi groups stay open: picking several labels should not need a click to open first.
+	const expanded = $derived(focused || group.kind === 'multi');
 	const holdsLabels = $derived(hasLabels(draft, group.id));
 	const reviewed = $derived(holdsLabels || !draft.notReviewed.includes(group.id));
 	const uncertainty = $derived(uncertaintyOf(suggestion, group));
@@ -107,13 +109,13 @@
 	}
 
 	$effect(() => {
-		if (expanded) {
+		if (focused) {
 			element?.scrollIntoView({ block: 'nearest' });
 		}
 	});
 </script>
 
-<section bind:this={element} aria-label={group.label} class="border-line-faint border-b transition-colors {expanded ? 'bg-surface' : 'hover:bg-hover/40'}">
+<section bind:this={element} aria-label={group.label} class="border-line-faint border-b border-l-2 transition-colors {focused ? 'border-l-action bg-surface' : 'border-l-transparent hover:bg-hover/40'}">
 	<button
 		type="button"
 		tabindex="-1"

@@ -3,8 +3,10 @@
 	import type { LabelingSession } from './labelingSession.svelte';
 	import { activeRefinements } from './draft';
 	import GroupCard from './GroupCard.svelte';
+	import LabelSearch from './LabelSearch.svelte';
 	import CaretDownIcon from 'phosphor-svelte/lib/CaretDown';
 	import CaretRightIcon from 'phosphor-svelte/lib/CaretRight';
+	import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlass';
 	import SparkleIcon from 'phosphor-svelte/lib/Sparkle';
 
 	let { session }: { session: LabelingSession } = $props();
@@ -33,15 +35,23 @@
 {/snippet}
 
 <div class="flex flex-col">
-	<div class="border-line bg-canvas text-dim sticky top-0 z-10 flex h-10 items-center gap-2 border-b px-3 text-xs">
-		{#if session.suggestion}
-			<SparkleIcon size={13} class="text-green" />
-			<span class="flex-1">Proposals from <span class="font-mono">{session.suggestion.source}</span></span>
-			<button type="button" tabindex="-1" class="btn btn-xs btn-ghost" disabled={!session.acceptable} onmousedown={(event) => event.preventDefault()} onclick={() => session.acceptSuggestions()}>
-				Accept <span class="font-mono opacity-50">A</span>
+	<div class="sticky top-0 z-10">
+		<div class="border-line bg-canvas text-dim flex h-10 items-center gap-2 border-b px-3 text-xs">
+			{#if session.suggestion}
+				<SparkleIcon size={13} class="text-green" />
+				<span class="flex-1">Proposals from <span class="font-mono">{session.suggestion.source}</span></span>
+				<button type="button" tabindex="-1" class="btn btn-xs btn-ghost" disabled={!session.acceptable} onmousedown={(event) => event.preventDefault()} onclick={() => session.acceptSuggestions()}>
+					Accept <span class="font-mono opacity-50">A</span>
+				</button>
+			{:else}
+				<span class="flex-1">No proposals for this item yet</span>
+			{/if}
+			<button type="button" tabindex="-1" class="btn btn-xs btn-ghost" onmousedown={(event) => event.preventDefault()} onclick={() => (session.searchOpen = true)} title="Search labels (/)">
+				<MagnifyingGlassIcon size={13} /> <span class="font-mono opacity-50">/</span>
 			</button>
-		{:else}
-			<span class="flex-1">No proposals for this item yet</span>
+		</div>
+		{#if session.searchOpen}
+			<LabelSearch {session} />
 		{/if}
 	</div>
 
