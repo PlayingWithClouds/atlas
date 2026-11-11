@@ -22,7 +22,7 @@ import {
   valuesOfGroup,
 } from './draft';
 import type { Draft } from './draft';
-import { actionForKey, isRepeatable } from './keyboardMap';
+import { actionForKey, isRepeatable, pressOf } from './keyboardMap';
 import type { KeyPress, LabelAction } from './keyboardMap';
 import { MIN_RANGE_SECONDS, addRange, closePending, deleteRange, effectiveSpan, findPending, isSameSpan, itemTimeOf, refineRange, replaceRange, restartPending, togglePending, trimEdge } from './ranges';
 import type { PendingRange, RangeTarget } from './ranges';
@@ -793,7 +793,7 @@ export class LabelingSession {
     const labels = this.keyedLabelsOfFocusedGroup();
     const afterLeader = this.leaderPending;
     this.endLeader();
-    const action = actionForKey({ ...press, afterLeader }, labels, settings.keymap);
+    const action = actionForKey(pressOf(press, { afterLeader }), labels, settings.keymap);
     if (action === undefined) {
       return undefined;
     }

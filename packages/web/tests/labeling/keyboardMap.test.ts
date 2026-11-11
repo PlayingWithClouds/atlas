@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { actionForKey, buildKeymap, chordToRecord, conflictsOf, isReservedHotkey, isRepeatable, keyHelp, normalizeChord } from '../../src/core/labeling/keyboardMap';
+import { actionForKey, buildKeymap, chordToRecord, conflictsOf, isReservedHotkey, isRepeatable, keyHelp, normalizeChord, pressOf } from '../../src/core/labeling/keyboardMap';
 import type { KeyPress, KeyedLabel, LabelAction } from '../../src/core/labeling/keyboardMap';
 
 function press(key: string, extra: Partial<KeyPress> = {}): KeyPress {
@@ -92,6 +92,40 @@ describe('actionForKey with the default keymap', () => {
   test('moving keys repeat when held, the rest do not', () => {
     expect(isRepeatable(actionForKey(press('.'), labels) as LabelAction)).toBe(true);
     expect(isRepeatable(actionForKey(press('Enter', { altKey: true }), labels) as LabelAction)).toBe(false);
+  });
+});
+
+describe('real key events', () => {
+  /** Like a browser KeyboardEvent: the fields are getters on the prototype, not own properties. */
+  function eventLike(key: string, shiftKey = false): KeyPress {
+    const prototype = {
+      get key() {
+        return key;
+      },
+      get shiftKey() {
+        return shiftKey;
+      },
+      get ctrlKey() {
+        return false;
+      },
+      get altKey() {
+        return false;
+      },
+      get metaKey() {
+        return false;
+      },
+    };
+    return Object.create(prototype) as KeyPress;
+  }
+
+  test('pressOf copies prototype getters, which a spread would drop', () => {
+    expect({ ...eventLike('s') }.key).toBeUndefined();
+    expect(pressOf(eventLike('s'), { afterLeader: true })).toMatchObject({ key: 's', shiftKey: false, afterLeader: true });
+    expect(actionForKey(pressOf(eventLike('s')), labels)).toEqual({ kind: 'acceptHere' });
+  });
+
+  test('recording a key works on event-like presses', () => {
+    expect(chordToRecord(eventLike('$', true))).toBe('$');
   });
 });
 
