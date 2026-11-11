@@ -10,7 +10,7 @@
 	import MetaDetails from './MetaDetails.svelte';
 	import { effectiveSpan } from './ranges';
 	import Timeline from './Timeline.svelte';
-	import { formatSpan } from '../shared/time';
+	import { formatClock, formatSpan } from '../shared/time';
 
 	let { params }: { params: Record<string, string> } = $props();
 
@@ -19,6 +19,8 @@
 	const session = new LabelingSession(ctx, () => params.project);
 
 	let cheatSheetOpen = $state(false);
+	/** Asset seconds hovered on the timeline; the player area shows that frame meanwhile. */
+	let previewSeconds = $state<number | undefined>(undefined);
 
 	const detail = $derived(session.detail);
 	const media = $derived.by(() => {
@@ -108,9 +110,15 @@
 
 		<div class="flex min-h-0 flex-1 gap-4 p-4 {session.loading ? 'opacity-60' : ''}">
 			<div class="flex min-w-0 flex-1 flex-col gap-3">
-				<div class="border-line min-h-0 flex-1 overflow-hidden rounded-lg border bg-black">
+				<div class="border-line relative min-h-0 flex-1 overflow-hidden rounded-lg border bg-black">
 					{#if media}
 						<media.player asset={detail.asset} span={session.playSpan} poster={detail.item.poster} onready={(handle) => session.setHandle(handle)} ontime={(seconds) => (session.playhead = seconds)} />
+						{#if media.frame && previewSeconds !== undefined}
+							<div class="pointer-events-none absolute inset-0 z-10 bg-black">
+								<media.frame asset={detail.asset} seconds={previewSeconds} />
+								<span class="absolute top-3 left-1/2 -translate-x-1/2 rounded-md bg-black/70 px-2.5 py-1 font-mono text-sm text-white tabular-nums">{formatClock(previewSeconds, 2)}</span>
+							</div>
+						{/if}
 					{:else}
 						<EmptyState title={`No player for ${detail.asset.kind}`} hint="Enable a media plugin that registers a player for this kind." />
 					{/if}
@@ -139,6 +147,7 @@
 						onarm={(target) => session.armLabel(target)}
 						selectedRefinements={session.selectedRefinements}
 						onrefine={(target) => session.refineSelected(target)}
+						onhover={(seconds) => (previewSeconds = seconds)}
 						ondelete={(range) => session.deleteRange(range)}
 					/>
 					{#if session.loopedRange}

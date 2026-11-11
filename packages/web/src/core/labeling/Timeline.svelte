@@ -37,7 +37,8 @@
 		onarm,
 		selectedRefinements,
 		onrefine,
-		ondelete
+		ondelete,
+		onhover
 	}: {
 		asset: Asset;
 		media: MediaPlayerContribution | undefined;
@@ -65,10 +66,11 @@
 		selectedRefinements: { group: Group; chosen: string[]; wholeItem: string[] }[];
 		onrefine: (target: RangeTarget) => void;
 		ondelete: (range: Range) => void;
+		/** Asset seconds under the pointer while it hovers the timeline (not while dragging); the page previews that frame. */
+		onhover: (seconds: number | undefined) => void;
 	} = $props();
 
-	const PREVIEW_WIDTH = 384;
-	const FILMSTRIP_CELL_PIXELS = 88;
+	const FILMSTRIP_CELL_PIXELS = 128;
 	const SNAP_PIXELS = 6;
 	/** Pointer travel below this is a click, not a drag. */
 	const CLICK_PIXELS = 3;
@@ -81,7 +83,6 @@
 	let container = $state<HTMLElement>();
 	let ruler = $state<HTMLElement>();
 	let laneWidth = $state(0);
-	let containerWidth = $state(0);
 	let view = $state<TimelineWindow | undefined>(undefined);
 	let hover = $state<{ seconds: number; x: number } | undefined>(undefined);
 	let drag = $state.raw<Drag | undefined>(undefined);
@@ -212,11 +213,13 @@
 		hover = { seconds: secondsAtClientX(event.clientX), x: event.clientX - containerBox.left };
 	}
 
-	const previewLeft = $derived.by(() => {
-		if (hover === undefined) {
-			return 0;
+	// The page shows the hovered frame in the player; dragging shows the real playhead instead.
+	$effect(() => {
+		if (hover === undefined || drag !== undefined) {
+			onhover(undefined);
+			return;
 		}
-		return Math.min(Math.max(0, hover.x - PREVIEW_WIDTH / 2), Math.max(0, containerWidth - PREVIEW_WIDTH));
+		onhover(hover.seconds);
 	});
 
 	// --- dragging --------------------------------------------------------------------------
@@ -406,26 +409,17 @@
 
 <div
 	bind:this={container}
-	bind:clientWidth={containerWidth}
-	class="relative flex flex-col gap-1 select-none"
-	style="--gutter: 9rem"
+	class="relative flex flex-col gap-1.5 select-none"
+	style="--gutter: 11rem"
 	onpointermove={updateHover}
 	onpointerleave={() => (hover = undefined)}
 	role="group"
 	aria-label="Timeline"
 >
-	{#if hover && media?.frame && drag?.kind !== 'scrub'}
-		<div class="border-line pointer-events-none absolute bottom-full z-30 mb-2 overflow-hidden rounded-md border bg-black shadow-xl" style="left: {previewLeft}px; width: {PREVIEW_WIDTH}px">
-			<div class="aspect-video w-full">
-				<media.frame {asset} seconds={hover.seconds} />
-			</div>
-			<div class="bg-black/80 px-2 py-0.5 text-center font-mono text-[11px] text-white tabular-nums">{formatClock(hover.seconds, 2)}</div>
-		</div>
-	{/if}
 
 	<!-- ruler: filmstrip, item span, trim, ticks -->
 	<div class="grid grid-cols-[var(--gutter)_1fr] items-stretch gap-2">
-		<div class="text-dim flex flex-col justify-center text-right font-mono text-[11px] leading-tight tabular-nums">
+		<div class="text-dim flex flex-col justify-center text-right font-mono text-xs leading-snug tabular-nums">
 			<span class="text-default">{formatClock(playhead, 2)}</span>
 			<span>f{Math.floor(playhead * frameRate + 1e-3)} · {Math.round(frameRate * 100) / 100} fps</span>
 		</div>
@@ -437,23 +431,23 @@
 			aria-label="Seek"
 			aria-valuenow={playhead}
 			onpointerdown={startScrub}
-			class="border-line bg-surface relative h-[4.25rem] cursor-col-resize overflow-hidden rounded-md border"
+			class="border-line bg-surface relative h-[6.25rem] cursor-col-resize overflow-hidden rounded-md border"
 		>
 			{#if media?.filmstrip}
-				<div class="pointer-events-none absolute inset-x-0 top-0 h-12 opacity-80">
+				<div class="pointer-events-none absolute inset-x-0 top-0 h-20 opacity-90">
 					<media.filmstrip {asset} start={axis.start} end={axis.end} count={filmstripCount} />
 				</div>
 			{/if}
 			<div class="pointer-events-none absolute top-0 left-0 h-12 bg-black/55" style="width: {left(itemSpan.start)}%"></div>
 			<div class="pointer-events-none absolute top-0 right-0 h-12 bg-black/55" style="width: {100 - left(itemSpan.end)}%"></div>
-			<div class="border-blue pointer-events-none absolute top-0 h-12 border-x-2" style="left: {left(itemSpan.start)}%; width: {widthBetween(itemSpan.start, itemSpan.end)}%" title="Item span"></div>
+			<div class="border-blue pointer-events-none absolute top-0 h-20 border-x-2" style="left: {left(itemSpan.start)}%; width: {widthBetween(itemSpan.start, itemSpan.end)}%" title="Item span"></div>
 			{#if trimmed}
-				<div class="border-amber pointer-events-none absolute top-1 h-10 border-x-2 border-dashed" style="left: {left(trimmed.start)}%; width: {widthBetween(trimmed.start, trimmed.end)}%" title="Trimmed span"></div>
+				<div class="border-amber pointer-events-none absolute top-1 h-18 border-x-2 border-dashed" style="left: {left(trimmed.start)}%; width: {widthBetween(trimmed.start, trimmed.end)}%" title="Trimmed span"></div>
 			{/if}
-			<div class="pointer-events-none absolute inset-x-0 bottom-0 h-[1.1rem] bg-black/40">
+			<div class="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-black/40">
 				{#each ticks as tick (tick)}
 					<div class="absolute bottom-0 h-full border-l border-white/20" style="left: {left(tick)}%">
-						<span class="text-dim absolute bottom-0.5 left-1 font-mono text-[10px] whitespace-nowrap">{formatClock(tick, tickDecimals)}</span>
+						<span class="text-dim absolute bottom-0.5 left-1 font-mono text-[11px] whitespace-nowrap">{formatClock(tick, tickDecimals)}</span>
 					</div>
 				{/each}
 			</div>
@@ -471,7 +465,7 @@
 				onmousedown={(event) => event.preventDefault()}
 				onclick={() => onarm({ group: track.group.id, label: track.label.id })}
 				title={trackTitle(track)}
-				class="flex min-w-0 items-center justify-end gap-1 text-right text-[11px] leading-tight {track.armed ? 'text-default' : 'text-dim hover:text-muted'}"
+				class="flex min-w-0 items-center justify-end gap-1.5 text-right text-xs leading-tight {track.armed ? 'text-default' : 'text-dim hover:text-muted'}"
 			>
 				{#if track.refines}
 					<span class="text-violet">↳</span>
@@ -484,11 +478,11 @@
 			<div
 				role="presentation"
 				onpointerdown={(event) => startCreate(event, track)}
-				class="bg-surface relative cursor-crosshair rounded {track.refines ? 'h-5' : 'h-6'} {track.armed ? 'ring-violet/50 ring-1' : ''}"
+				class="bg-surface relative cursor-crosshair rounded {track.refines ? 'h-7' : 'h-9'} {track.armed ? 'ring-violet/50 ring-1' : ''}"
 				title={trackTitle(track)}
 			>
 				{#if track.whole}
-					<div class="bg-violet/25 border-violet/50 pointer-events-none absolute inset-y-0.5 flex items-center rounded-sm border border-dashed gap-1 overflow-hidden px-1.5 text-[11px] whitespace-nowrap text-white" style="left: {left(wholeSpan().start)}%; width: {widthBetween(wholeSpan().start, wholeSpan().end)}%">
+					<div class="bg-violet/25 border-violet/50 pointer-events-none absolute inset-y-0.5 flex items-center rounded-sm border border-dashed gap-1 overflow-hidden px-1.5 text-xs whitespace-nowrap text-white" style="left: {left(wholeSpan().start)}%; width: {widthBetween(wholeSpan().start, wholeSpan().end)}%">
 						<span class="font-medium">{track.label.name}</span>
 						{#if track.wholeNote}<span class="text-white/80">· {track.wholeNote}</span>{/if}
 						{#if track.armed}<span class="ml-auto pl-2 text-white/40">entire scene · drag inside to mark only parts</span>{/if}
@@ -522,7 +516,7 @@
 						class="absolute inset-y-0 cursor-grab overflow-hidden rounded-sm {barClass(range)}"
 						style="left: {left(itemStart + shown.start)}%; width: {widthBetween(itemStart + shown.start, itemStart + shown.end)}%"
 					>
-						<span class="pointer-events-none flex h-full items-center gap-1 px-1.5 text-[11px] whitespace-nowrap text-white">
+						<span class="pointer-events-none flex h-full items-center gap-1 px-1.5 text-xs whitespace-nowrap text-white">
 							<span class="font-medium">{track.label.name}</span>
 							{#if note}<span class="text-white/80">· {note}</span>{/if}
 							<span class="opacity-60">{formatClock(shown.end - shown.start, 1)}</span>
