@@ -1014,6 +1014,19 @@
 		height: 30px;
 		font-size: var(--text-xs);
 	}
+	/* Reads as plain text until hovered or focused; for dense editable tables. */
+	.input-ghost {
+		background: transparent;
+		border-color: transparent;
+		padding-inline: 8px;
+	}
+	.input-ghost:hover {
+		border-color: var(--border-faint);
+	}
+	.input-ghost:focus {
+		background: var(--surface-input);
+		border-color: var(--border-strong);
+	}
 	.form-control {
 		display: flex;
 		flex-direction: column;

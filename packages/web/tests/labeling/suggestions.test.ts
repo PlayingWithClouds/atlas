@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { Suggestion } from '@atlas/contracts';
 import { emptyDraft, setMoreExpanded, toggleLabel } from '../../src/core/labeling/draft';
-import { acceptProposals, chooseSuggestion, probabilityOf } from '../../src/core/labeling/suggestions';
+import { acceptProposals, chooseSuggestion, probabilityOf, uncertaintyOf } from '../../src/core/labeling/suggestions';
 import { taxonomy } from './fixtures';
 
 function suggestion(source: string, values: Suggestion['values']): Suggestion {
@@ -77,5 +77,27 @@ describe('acceptProposals', () => {
   test('does nothing without a suggestion', () => {
     const draft = emptyDraft();
     expect(acceptProposals(taxonomy, draft, undefined)).toBe(draft);
+  });
+});
+
+describe('uncertaintyOf', () => {
+  const position = taxonomy.groups.find((group) => group.id === 'position')!;
+  const activity = taxonomy.groups.find((group) => group.id === 'activity')!;
+
+  test('is 0 for a certain single choice and 1 for an even split', () => {
+    expect(uncertaintyOf(suggestion('p', { position: { standing: 1, sitting: 0 } }), position)).toBeCloseTo(0);
+    expect(uncertaintyOf(suggestion('p', { position: { standing: 0.5, sitting: 0.5 } }), position)).toBeCloseTo(1);
+  });
+
+  test('lets one coin-flip label decide a multi group', () => {
+    const unsure = suggestion('p', { activity: { talking: 0.01, dancing: 0.5 } });
+    expect(uncertaintyOf(unsure, activity)).toBeCloseTo(1);
+    const sure = suggestion('p', { activity: { talking: 0.99, dancing: 0.01 } });
+    expect(uncertaintyOf(sure, activity)).toBeCloseTo(0.02);
+  });
+
+  test('is undefined without probabilities for the group', () => {
+    expect(uncertaintyOf(undefined, position)).toBeUndefined();
+    expect(uncertaintyOf(suggestion('p', { activity: { talking: 0.5 } }), position)).toBeUndefined();
   });
 });
