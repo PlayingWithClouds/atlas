@@ -4,6 +4,7 @@ import DbCore from "./services/db";
 import HttpCore from "./services/http";
 import LiveCore from "./services/live";
 import NotificationsCore from "./services/notifications";
+import SettingsRoutes from "./services/settings";
 import PluginsCore from "./services/plugins";
 import WorkspaceCore from "./services/workspace";
 import LiveEvents from "./store/liveEvents";
@@ -42,6 +43,7 @@ async function mountCoreServices(context: Context, options: HostOptions, mounted
     [HttpCore, { port: options.port }],
     [LiveCore, undefined],
     [NotificationsCore, undefined],
+    [SettingsRoutes, undefined],
     [StoreCore, undefined],
     [StoreRoutes, undefined],
     [LiveEvents, undefined],

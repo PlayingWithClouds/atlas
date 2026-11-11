@@ -89,7 +89,7 @@
 				void session.refreshDetail();
 				return;
 			}
-			if (signal.type === 'projects' || signal.projectId !== params.project) return;
+			if (signal.type === 'projects' || signal.type === 'settings' || signal.projectId !== params.project) return;
 			if (signal.type === 'taxonomy') {
 				session.onTaxonomyChanged(signal.taxonomy);
 				return;

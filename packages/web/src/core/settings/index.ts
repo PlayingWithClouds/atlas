@@ -2,11 +2,13 @@ import type { Context } from '@neoworks/extension-system';
 import GearSixIcon from 'phosphor-svelte/lib/GearSix';
 import { contribute } from '../shared/contribute';
 import SettingsPage from './SettingsPage.svelte';
+import { settings } from './settings.svelte';
 
 export const settingsPlugin = {
   name: 'core-settings',
-  inject: ['routes', 'nav', 'commands', 'router'],
+  inject: ['routes', 'nav', 'commands', 'router', 'api', 'live'],
   apply(ctx: Context) {
+    ctx.effect(() => settings.connect(ctx.api, ctx.live), 'settings:sync');
     contribute(ctx, ctx.routes, { id: 'core.settings', path: '/projects/:project/settings', component: SettingsPage });
     contribute(ctx, ctx.nav, { id: 'core.settings', label: 'Settings', icon: GearSixIcon, path: 'settings', order: 90 });
     contribute(ctx, ctx.commands, {

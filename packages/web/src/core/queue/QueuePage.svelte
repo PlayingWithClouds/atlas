@@ -220,7 +220,7 @@
 				scheduleReload();
 				return;
 			}
-			if (signal.type === 'projects' || signal.type === 'taxonomy') return;
+			if (signal.type === 'projects' || signal.type === 'taxonomy' || signal.type === 'settings') return;
 			if (signal.projectId === projectId) {
 				scheduleReload();
 			}

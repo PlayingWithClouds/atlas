@@ -199,6 +199,8 @@ All bodies are JSON. Types are in `packages/contracts/src/schema.ts`, rules in
 | DELETE | `/api/projects/:project/items/:item/annotation` | | `204` |
 | POST | `/api/projects/:project/suggestions` | `Suggestion[]` | batch result |
 | GET | `/api/projects/:project/annotations` | `?since=<cursor>&limit=` | `{ changes: Change[], cursor }` |
+| GET | `/api/settings/:scope` | | settings object, `{}` when unset |
+| PUT | `/api/settings/:scope` | JSON object | the same object |
 
 ```ts
 interface Project {
@@ -238,7 +240,11 @@ type Event =
 
 The web app receives `LiveEvent`s over the WebSocket at `/api/live`. They tell it that items,
 suggestions, an annotation, a taxonomy or the project list changed, so the screens refresh
-without reloading.
+without reloading. A `settings` event (`{ scope }`) says shared settings changed.
+
+Settings are kept in the workspace's `atlas.json` under `settings.<scope>` and shared by every
+browser on the workspace; the web app uses scope `web` (key bindings, leader, seek and zoom
+steps). PUT replaces the whole scope.
 
 ## Typical adapters
 

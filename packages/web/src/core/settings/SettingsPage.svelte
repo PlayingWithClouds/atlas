@@ -124,7 +124,16 @@
 		return settings.value.leader;
 	}
 
-	function resetAll() {
+	function syncText(): string {
+		const texts = {
+			synced: 'Shared by every browser on this workspace (atlas.json)',
+			saving: 'Saving…',
+			offline: 'Server unreachable: kept in this browser, shared once it is back'
+		};
+		return texts[settings.sync];
+	}
+
+		function resetAll() {
 		if (confirm('Reset every key and setting to its default?')) {
 			settings.resetAll();
 		}
@@ -134,7 +143,7 @@
 <svelte:window onkeydowncapture={onKeydownCapture} />
 
 <div class="mx-auto max-w-4xl p-6">
-	<PageHeader title="Settings" subtitle="Saved in this browser">
+	<PageHeader title="Settings" subtitle={syncText()}>
 		{#snippet actions()}
 			<button type="button" class="btn btn-outline" onclick={resetAll}><ArrowCounterClockwiseIcon size={14} /> Reset all</button>
 		{/snippet}
