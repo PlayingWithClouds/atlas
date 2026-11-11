@@ -58,6 +58,13 @@ export interface Asset {
   poster?: string;
   /** Seconds, videos only. */
   duration?: number;
+  /** Frames per second, videos only; makes single-frame steps exact (measured while playing otherwise). */
+  frameRate?: number;
+  /**
+   * WebVTT thumbnail track for seek previews: cues whose text is an image URL, optionally a sprite
+   * tile (`sprite.jpg#xywh=0,0,160,90`), relative to the track. Grabbed from the video otherwise.
+   */
+  thumbnails?: string;
   width?: number;
   height?: number;
   title?: string;

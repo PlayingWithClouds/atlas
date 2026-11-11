@@ -61,9 +61,13 @@ export interface PlayerHandle {
   readonly paused: boolean;
   readonly muted: boolean;
   readonly playbackRate: number;
+  /** Frames per second: the asset's, else measured, else a guess of 30. */
+  readonly frameRate: number;
   play(): void;
   pause(): void;
   seek(seconds: number): void;
+  /** Pauses and moves `count` frames (negative = back). */
+  stepFrames(count: number): void;
   setMuted(muted: boolean): void;
   setPlaybackRate(rate: number): void;
 }
@@ -87,12 +91,29 @@ export interface MediaPreviewProps {
   poster?: string;
 }
 
-/** The player and the grid preview for one asset kind. */
+/** One still of an asset at a time, filling its box; used for the timeline's seek preview. */
+export interface FramePreviewProps {
+  asset: Asset;
+  /** Asset seconds. */
+  seconds: number;
+}
+
+/** `count` evenly spaced stills between `start` and `end` (asset seconds), side by side. */
+export interface FilmstripProps {
+  asset: Asset;
+  start: number;
+  end: number;
+  count: number;
+}
+
+/** The player and the grid preview for one asset kind, plus optional timeline stills. */
 export interface MediaPlayerContribution {
   id: string;
   kind: AssetKind;
   player: Component<MediaPlayerProps>;
   preview: Component<MediaPreviewProps>;
+  frame?: Component<FramePreviewProps>;
+  filmstrip?: Component<FilmstripProps>;
 }
 
 export interface Toasts {

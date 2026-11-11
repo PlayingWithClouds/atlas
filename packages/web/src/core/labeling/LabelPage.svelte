@@ -118,17 +118,32 @@
 
 				{#if showTimeline && itemSpan}
 					<Timeline
+						asset={detail.asset}
+						{media}
 						{itemSpan}
 						trimmed={session.draft.span}
-						duration={detail.asset.duration}
 						playhead={session.playhead}
-						groups={session.taxonomy ? session.taxonomy.groups : []}
-						ranges={session.draft.ranges}
+						frameRate={session.frameRate()}
+						tracks={session.tracks}
 						pending={session.pendingRange}
 						itemStart={session.itemStart}
+						length={session.length}
+						selected={session.selectedRange}
+						looped={session.loopedRange}
 						onseek={(seconds) => session.seekTo(seconds)}
-						ondelete={(range) => session.deleteRange(range)}
+						onselect={(range) => session.selectRange(range)}
+						onloop={(range) => session.toggleLoop(range)}
+						oncreate={(target, first, second) => session.createRange(target, first, second)}
+						onchange={(previous, next) => session.replaceRange(previous, next)}
+						onaccept={(ghost) => session.acceptSuggestedRange(ghost)}
+						onarm={(target) => session.armLabel(target)}
 					/>
+					{#if session.loopedRange}
+						<div class="text-amber flex items-center gap-2 text-xs">
+							Looping {session.loopedRange.group}.{session.loopedRange.label} only
+							<button type="button" tabindex="-1" class="btn btn-ghost btn-xs" onclick={() => session.cancelRange()}>Back to the whole item <kbd class="ml-1 font-mono text-[10px] opacity-60">Esc</kbd></button>
+						</div>
+					{/if}
 					{#if session.draft.span}
 						<div class="text-amber flex items-center gap-2 text-xs">
 							Trimmed to {formatSpan(session.draft.span)} (recorded with the label; the item itself is unchanged)

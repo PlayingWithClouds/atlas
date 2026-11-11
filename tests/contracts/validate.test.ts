@@ -108,4 +108,6 @@ test("isGroupActive follows the condition", () => {
   expect(isGroupActive(conditional, { act: ["kissing"] })).toBe(false);
   expect(isGroupActive(conditional, {})).toBe(false);
   expect(isGroupActive(taxonomy.groups[0], {})).toBe(true);
+  expect(isGroupActive(conditional, {}, [{ group: "act", label: "blowjob", start: 1, end: 3 }])).toBe(true);
+  expect(isGroupActive(conditional, {}, [{ group: "act", label: "kissing", start: 1, end: 3 }])).toBe(false);
 });

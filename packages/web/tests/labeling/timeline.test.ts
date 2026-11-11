@@ -1,5 +1,20 @@
 import { describe, expect, test } from 'bun:test';
-import { percentAt, rangeRows, secondsAtFraction, timelineWindow } from '../../src/core/labeling/timeline';
+import { MIN_RANGE_SECONDS } from '../../src/core/labeling/ranges';
+import {
+  MIN_VIEW_SECONDS,
+  draggedRange,
+  labelTracks,
+  pageTo,
+  panWindow,
+  percentAt,
+  rangeBetween,
+  secondsAtFraction,
+  snapTime,
+  tickStep,
+  ticksOf,
+  timelineWindow,
+  zoomWindow,
+} from '../../src/core/labeling/timeline';
 import { formatClock } from '../../src/core/shared/time';
 import { taxonomy } from './fixtures';
 
@@ -25,23 +40,118 @@ describe('timeline window', () => {
   });
 });
 
-describe('range rows', () => {
-  const window = { start: 100, end: 200 };
+describe('zoom and pan', () => {
+  const bounds = { start: 0, end: 600 };
 
-  test('places item-relative ranges on the asset axis, one row per group', () => {
-    const ranges = [
-      { group: 'activity', label: 'talking', start: 10, end: 20 },
-      { group: 'position', label: 'sitting', start: 0, end: 50 },
-    ];
-    const rows = rangeRows(taxonomy.groups, ranges, window, 100);
-    expect(rows.map((row) => row.group.id)).toEqual(['position', 'activity']);
-    expect(rows[1].bars[0].left).toBe(10);
-    expect(rows[1].bars[0].width).toBe(10);
+  test('zooms around the anchor and keeps it in place', () => {
+    const zoomed = zoomWindow({ start: 100, end: 200 }, bounds, 150, 0.5);
+    expect(zoomed).toEqual({ start: 125, end: 175 });
+    const off = zoomWindow({ start: 100, end: 200 }, bounds, 100, 0.5);
+    expect(off).toEqual({ start: 100, end: 150 });
   });
 
-  test('adds a row for the group whose range is being drawn', () => {
-    const rows = rangeRows(taxonomy.groups, [], window, 100, 'activity');
-    expect(rows.map((row) => row.group.id)).toEqual(['activity']);
+  test('never zooms past the asset or below a second', () => {
+    expect(zoomWindow({ start: 100, end: 200 }, bounds, 150, 100)).toEqual(bounds);
+    const tight = zoomWindow({ start: 100, end: 102 }, bounds, 101, 0.01);
+    expect(tight.end - tight.start).toBe(MIN_VIEW_SECONDS);
+  });
+
+  test('pans inside the asset', () => {
+    expect(panWindow({ start: 100, end: 200 }, bounds, 50)).toEqual({ start: 150, end: 250 });
+    expect(panWindow({ start: 100, end: 200 }, bounds, -500)).toEqual({ start: 0, end: 100 });
+    expect(panWindow({ start: 100, end: 200 }, bounds, 900)).toEqual({ start: 500, end: 600 });
+  });
+
+  test('pages to keep a running playhead in view', () => {
+    expect(pageTo({ start: 0, end: 100 }, bounds, 120)).toEqual({ start: 110, end: 210 });
+  });
+});
+
+describe('ruler', () => {
+  test('picks round tick steps that leave room for their labels', () => {
+    expect(tickStep({ start: 0, end: 60 }, 600)).toBe(10);
+    expect(tickStep({ start: 0, end: 3 }, 600)).toBe(0.5);
+    expect(ticksOf({ start: 9.5, end: 31 }, 10)).toEqual([10, 20, 30]);
+  });
+});
+
+describe('label tracks', () => {
+  const position = taxonomy.groups[0];
+  const activity = taxonomy.groups[2];
+
+  test('one track per label that is on, in ranges, suggested or armed', () => {
+    const tracks = labelTracks({
+      groups: taxonomy.groups,
+      values: { position: ['sitting'] },
+      ranges: [{ group: 'activity', label: 'talking', start: 1, end: 4 }],
+      suggested: [
+        { group: 'activity', label: 'dancing', start: 5, end: 9, score: 0.8 },
+        { group: 'extras', label: 'hat', start: 0, end: 2, score: 0.1 },
+      ],
+      armed: { group: 'extras', label: 'glasses' },
+    });
+    expect(tracks.map((track) => `${track.group.id}.${track.label.id}`)).toEqual([
+      'position.sitting',
+      'activity.talking',
+      'activity.dancing',
+      'extras.glasses',
+    ]);
+    expect(tracks[0].whole).toBe(true);
+    expect(tracks[1].ranges).toHaveLength(1);
+    expect(tracks[2].ghosts).toHaveLength(1);
+    expect(tracks[3].armed).toBe(true);
+  });
+
+  test('hides suggestions a range already covers and those of inactive groups', () => {
+    const tracks = labelTracks({
+      groups: taxonomy.groups,
+      values: {},
+      ranges: [{ group: 'activity', label: 'talking', start: 0, end: 4 }],
+      suggested: [
+        { group: 'activity', label: 'talking', start: 2, end: 6, score: 0.9 },
+        { group: 'pose', label: 'arms-up', start: 0, end: 2, score: 0.9 },
+      ],
+    });
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0].ghosts).toEqual([]);
+    expect(position.id).toBe('position');
+    expect(activity.id).toBe('activity');
+  });
+
+  test('a range of the condition label opens the conditional group', () => {
+    const tracks = labelTracks({
+      groups: taxonomy.groups,
+      values: {},
+      ranges: [{ group: 'position', label: 'standing', start: 0, end: 4 }],
+      suggested: [{ group: 'pose', label: 'arms-up', start: 0, end: 2, score: 0.9 }],
+    });
+    expect(tracks.map((track) => track.label.id)).toEqual(['standing', 'arms-up']);
+  });
+});
+
+describe('editing ranges', () => {
+  const range = { group: 'activity', label: 'talking', start: 2, end: 5 };
+
+  test('drags edges and bars inside the item', () => {
+    expect(draggedRange(range, 'start', -1, 10)).toEqual({ ...range, start: 1 });
+    expect(draggedRange(range, 'start', -9, 10)).toEqual({ ...range, start: 0 });
+    expect(draggedRange(range, 'start', 9, 10).start).toBeCloseTo(5 - MIN_RANGE_SECONDS);
+    expect(draggedRange(range, 'end', 9, 10)).toEqual({ ...range, end: 10 });
+    expect(draggedRange(range, 'move', 9, 10)).toEqual({ ...range, start: 7, end: 10 });
+    expect(draggedRange(range, 'move', -9, undefined)).toEqual({ ...range, start: 0, end: 3 });
+  });
+
+  test('builds a range from a drag in either direction', () => {
+    const target = { group: 'activity', label: 'talking' };
+    expect(rangeBetween(target, 6, 2, 10)).toEqual({ ...target, start: 2, end: 6 });
+    expect(rangeBetween(target, -1, 12, 10)).toEqual({ ...target, start: 0, end: 10 });
+    expect(rangeBetween(target, 3, 3.01, 10)).toBeUndefined();
+  });
+
+  test('snaps to the playhead nearby, else to frames', () => {
+    expect(snapTime(10.02, 10, 0.05, 25)).toBe(10);
+    expect(snapTime(12.03, 10, 0.05, 25)).toBe(12.04);
+    expect(snapTime(12.03, 10, 0.05, 0)).toBe(12.03);
   });
 });
 

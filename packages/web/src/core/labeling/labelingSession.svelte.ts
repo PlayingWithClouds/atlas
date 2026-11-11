@@ -23,15 +23,17 @@ import {
 import type { Draft } from './draft';
 import { actionForKey } from './keyboardMap';
 import type { KeyPress, LabelAction } from './keyboardMap';
-import { addRange, effectiveSpan, itemTimeOf, removeRange, stepRange, trimEdge } from './ranges';
-import type { PendingRange } from './ranges';
+import { MIN_RANGE_SECONDS, addRange, effectiveSpan, itemTimeOf, removeRange, stepRange, trimEdge } from './ranges';
+import type { PendingRange, RangeTarget } from './ranges';
 import { acceptProposals, chooseSuggestion } from './suggestions';
+import { labelTracks, rangeBetween } from './timeline';
+import type { SuggestedRange } from './timeline';
 
 const NOTICE_LIFETIME_MS = 4000;
 
 /** Holding a key must not save, skip or toggle over and over; moving and seeking may repeat. */
 function isRepeatable(action: LabelAction): boolean {
-  return action.kind === 'seek' || action.kind === 'focusGroup';
+  return action.kind === 'seek' || action.kind === 'stepFrames' || action.kind === 'focusGroup';
 }
 
 /** Everything the labeling screen knows and can do for one item at a time. */
@@ -41,13 +43,17 @@ export class LabelingSession {
   draft = $state.raw<Draft>(emptyDraft());
   focusedGroupId = $state<string | undefined>(undefined);
   pendingRange = $state.raw<PendingRange | undefined>(undefined);
+  /** The range clicked on the timeline; [ and ] move its edges, Backspace deletes it. */
+  selectedRange = $state.raw<Range | undefined>(undefined);
+  /** A range the player loops instead of the item (double-click on it). */
+  loopedRange = $state.raw<Range | undefined>(undefined);
   playhead = $state(0);
   loading = $state(true);
   saving = $state(false);
   loadError = $state('');
   serverProblems = $state.raw<string[]>([]);
   notice = $state('');
-  handle: PlayerHandle | undefined;
+  handle = $state.raw<PlayerHandle | undefined>(undefined);
 
   private loadedFingerprint = $state('');
   private lastTouchedLabel = $state.raw<Record<string, string>>({});
@@ -72,6 +78,10 @@ export class LabelingSession {
   readonly playSpan = $derived.by(() => {
     if (this.item === undefined) {
       return undefined;
+    }
+    const looped = this.loopedRange;
+    if (looped !== undefined && this.draft.ranges.includes(looped)) {
+      return { start: this.itemStart + looped.start, end: this.itemStart + looped.end };
     }
     return effectiveSpan(this.item.span, this.draft.span, this.asset?.duration);
   });
@@ -99,6 +109,34 @@ export class LabelingSession {
       return undefined;
     }
     return chooseSuggestion(this.detail.suggestions, this.project.prefillSource);
+  });
+  /** The label R, [ ] and a drag in its track act on: the focused group's last touched label. */
+  readonly armed = $derived.by((): RangeTarget | undefined => {
+    const group = this.focusedGroup;
+    if (group === undefined) {
+      return undefined;
+    }
+    const labelId = this.focusedLabelId(group);
+    if (labelId === undefined) {
+      return undefined;
+    }
+    return { group: group.id, label: labelId };
+  });
+  readonly tracks = $derived.by(() => {
+    if (this.taxonomy === undefined) {
+      return [];
+    }
+    let suggested: SuggestedRange[] = [];
+    if (this.suggestion !== undefined && this.suggestion.ranges !== undefined) {
+      suggested = this.suggestion.ranges;
+    }
+    return labelTracks({
+      groups: this.taxonomy.groups,
+      values: this.draft.values,
+      ranges: this.draft.ranges,
+      suggested,
+      armed: this.armed,
+    });
   });
   readonly acceptable = $derived.by(() => {
     if (this.taxonomy === undefined) {
@@ -165,6 +203,8 @@ export class LabelingSession {
     this.draft = draftFromAnnotation(project.taxonomy, detail.annotation);
     this.loadedFingerprint = fingerprintOf(project.taxonomy, this.draft);
     this.pendingRange = undefined;
+    this.selectedRange = undefined;
+    this.loopedRange = undefined;
     this.serverProblems = [];
     this.lastTouchedLabel = {};
     this.focusedGroupId = this.focusable[0]?.id;
@@ -228,6 +268,17 @@ export class LabelingSession {
 
   seekTo(seconds: number): void {
     this.handle?.seek(seconds);
+  }
+
+  stepFrames(count: number): void {
+    this.handle?.stepFrames(count);
+  }
+
+  frameRate(): number {
+    if (this.handle === undefined) {
+      return 30;
+    }
+    return this.handle.frameRate;
   }
 
   toggleMuted(): void {
@@ -309,6 +360,26 @@ export class LabelingSession {
 
   // --- trim and ranges -----------------------------------------------------------------
 
+  /** [ and ]: the selected range's edge if one is selected, else the item's trim. */
+  setEdge(edge: 'start' | 'end'): void {
+    const selected = this.selectedRange;
+    if (selected !== undefined && this.draft.ranges.includes(selected)) {
+      this.moveRangeEdge(selected, edge);
+      return;
+    }
+    this.trim(edge);
+  }
+
+  private moveRangeEdge(range: Range, edge: 'start' | 'end'): void {
+    const time = itemTimeOf(this.currentTime(), this.itemStart, this.length);
+    const next = { ...range, [edge]: time };
+    if (next.end - next.start < MIN_RANGE_SECONDS) {
+      this.say('A range must start before it ends: move the playhead first');
+      return;
+    }
+    this.replaceRange(range, next);
+  }
+
   trim(edge: 'start' | 'end'): void {
     if (this.item === undefined || this.asset === undefined || this.asset.kind !== 'video') {
       this.say('Trimming needs a video');
@@ -326,7 +397,7 @@ export class LabelingSession {
     this.edit((_taxonomy, draft) => ({ ...draft, span: undefined }));
   }
 
-  private focusedLabelId(group: Group): string | undefined {
+  focusedLabelId(group: Group): string | undefined {
     const touched = this.lastTouchedLabel[group.id];
     const offered = offeredLabels(group, this.draft);
     if (touched !== undefined && offered.some((label) => label.id === touched)) {
@@ -363,10 +434,82 @@ export class LabelingSession {
 
   deleteRange(range: Range): void {
     this.edit((_taxonomy, draft) => removeRange(draft, range));
+    if (this.selectedRange === range) {
+      this.selectedRange = undefined;
+    }
+    if (this.loopedRange === range) {
+      this.loopedRange = undefined;
+    }
+  }
+
+  /** Adds a range between two asset times (a drag in a track) and selects it. */
+  createRange(target: RangeTarget, firstSeconds: number, secondSeconds: number): void {
+    const first = itemTimeOf(firstSeconds, this.itemStart, this.length);
+    const second = itemTimeOf(secondSeconds, this.itemStart, this.length);
+    const range = rangeBetween(target, first, second, this.length);
+    if (range === undefined) {
+      return;
+    }
+    this.armLabel(target);
+    this.edit((taxonomy, draft) => addRange(taxonomy, draft, range));
+    this.selectedRange = range;
+  }
+
+  /** Swaps a range for its edited copy; the selection and loop follow it. */
+  replaceRange(previous: Range, next: Range): void {
+    this.edit((taxonomy, draft) => addRange(taxonomy, removeRange(draft, previous), next));
+    if (this.selectedRange === previous) {
+      this.selectedRange = next;
+    }
+    if (this.loopedRange === previous) {
+      this.loopedRange = next;
+    }
+  }
+
+  acceptSuggestedRange(suggested: SuggestedRange): void {
+    const range = { group: suggested.group, label: suggested.label, start: suggested.start, end: suggested.end };
+    this.edit((taxonomy, draft) => addRange(taxonomy, draft, range));
+    this.selectedRange = range;
+  }
+
+  selectRange(range: Range | undefined): void {
+    this.selectedRange = range;
+    if (range !== undefined) {
+      this.armLabel(range);
+    }
+  }
+
+  /** Loops one range; again on the same range goes back to the item. */
+  toggleLoop(range: Range): void {
+    if (this.loopedRange === range) {
+      this.loopedRange = undefined;
+      return;
+    }
+    this.selectedRange = range;
+    this.loopedRange = range;
+    this.handle?.seek(this.itemStart + range.start);
+    this.handle?.play();
+  }
+
+  /** Makes a label the one ranges are drawn for: focuses its group and touches it. */
+  armLabel(target: RangeTarget): void {
+    this.focusedGroupId = target.group;
+    this.lastTouchedLabel = { ...this.lastTouchedLabel, [target.group]: target.label };
   }
 
   cancelRange(): void {
     this.pendingRange = undefined;
+    this.selectedRange = undefined;
+    this.loopedRange = undefined;
+  }
+
+  private deleteSelectedOrClear(): void {
+    const selected = this.selectedRange;
+    if (selected !== undefined && this.draft.ranges.includes(selected)) {
+      this.deleteRange(selected);
+      return;
+    }
+    this.clearFocusedGroup();
   }
 
   // --- saving and moving on ------------------------------------------------------------
@@ -450,11 +593,11 @@ export class LabelingSession {
       togglePlay: () => this.togglePlay(),
       save: () => void this.save('labeled'),
       skip: () => void this.save('skipped'),
-      clearGroup: () => this.clearFocusedGroup(),
+      clearGroup: () => this.deleteSelectedOrClear(),
       acceptProposals: () => this.acceptSuggestions(),
       copyPrevious: () => this.copyPrevious(),
-      trimStart: () => this.trim('start'),
-      trimEnd: () => this.trim('end'),
+      trimStart: () => this.setEdge('start'),
+      trimEnd: () => this.setEdge('end'),
       range: () => this.rangeKey(),
       toggleMore: () => this.toggleMore(),
       toggleMuted: () => this.toggleMuted(),
@@ -474,6 +617,9 @@ export class LabelingSession {
     }
     if (action.kind === 'seek') {
       this.seekBy(action.seconds);
+    }
+    if (action.kind === 'stepFrames') {
+      this.stepFrames(action.count);
     }
     if (action.kind === 'neighbour') {
       this.openNeighbour(action.offset);

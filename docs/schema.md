@@ -39,7 +39,7 @@ interface Group {
   label: string;              // shown in the UI
   kind: "single" | "multi";   // single: at most one label per item
   primary?: boolean;          // shown by default; other groups sit behind "more"
-  when?: { group: string; label: string };   // only asked while that label is on
+  when?: { group: string; label: string };   // only asked while that label is on (whole item or a range)
   labels: Label[];
 }
 
@@ -70,6 +70,9 @@ interface Asset {
   url: string;                // fetched by the browser: http(s) file with Range support, or HLS (.m3u8)
   poster?: string;            // still image URL
   duration?: number;          // seconds, videos
+  frameRate?: number;         // fps, videos; exact single-frame steps (measured while playing otherwise)
+  thumbnails?: string;        // WebVTT thumbnail track for seek previews (cue text = image URL, may be
+                              // a sprite tile "sprite.jpg#xywh=x,y,w,h"); grabbed from the video otherwise
   width?: number;
   height?: number;
   title?: string;

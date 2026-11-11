@@ -8,6 +8,7 @@
 	import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHigh';
 	import SpeakerSlashIcon from 'phosphor-svelte/lib/SpeakerSlash';
 	import { onMount } from 'svelte';
+	import { DEFAULT_FRAME_RATE, FrameRateMeter, frameIndexAt, frameStepTarget } from './frames';
 	import { formatTime, nextPlaybackRate } from './loopWindow';
 	import { SpanLoop } from './spanLoop';
 
@@ -29,6 +30,18 @@
 	let playhead = $state(0);
 	let failure = $state('');
 	let ready = $state(false);
+	let measuredFrameRate = $state<number | undefined>(undefined);
+	const meter = new FrameRateMeter();
+
+	const frameRate = $derived.by(() => {
+		if (asset.frameRate !== undefined && asset.frameRate > 0) {
+			return asset.frameRate;
+		}
+		if (measuredFrameRate !== undefined) {
+			return measuredFrameRate;
+		}
+		return DEFAULT_FRAME_RATE;
+	});
 
 	const loop = new SpanLoop({
 		video: () => element,
@@ -73,6 +86,29 @@
 		rate = next;
 	}
 
+	function stepFrames(count: number): void {
+		if (element === undefined) {
+			return;
+		}
+		element.pause();
+		loop.seek(frameStepTarget(element.currentTime, count, frameRate));
+	}
+
+	// Presented frames tell the real rate when the asset doesn't; only needed until it is known.
+	function watchFrames(video: HTMLVideoElement): () => void {
+		let handle = 0;
+		const onFrame = (_now: number, metadata: VideoFrameCallbackMetadata) => {
+			const measured = meter.observe(metadata.mediaTime);
+			if (measured !== undefined) {
+				measuredFrameRate = measured;
+				return;
+			}
+			handle = video.requestVideoFrameCallback(onFrame);
+		};
+		handle = video.requestVideoFrameCallback(onFrame);
+		return () => video.cancelVideoFrameCallback(handle);
+	}
+
 	const handle: PlayerHandle = {
 		get currentTime() {
 			return elementTime();
@@ -86,9 +122,13 @@
 		get playbackRate() {
 			return rate;
 		},
+		get frameRate() {
+			return frameRate;
+		},
 		play,
 		pause: () => element?.pause(),
 		seek: (seconds) => loop.seek(seconds),
+		stepFrames,
 		setMuted,
 		setPlaybackRate: setRate
 	};
@@ -112,7 +152,19 @@
 	$effect(() => {
 		failure = '';
 		ready = false;
+		measuredFrameRate = undefined;
 		return loop.load();
+	});
+
+	$effect(() => {
+		const video = element;
+		if (video === undefined || asset.frameRate !== undefined || measuredFrameRate !== undefined) {
+			return;
+		}
+		if (!('requestVideoFrameCallback' in video)) {
+			return;
+		}
+		return watchFrames(video);
 	});
 
 	$effect(() => {
@@ -151,7 +203,10 @@
 			loop.stop();
 			loop.report();
 		}}
-		onseeked={() => loop.report()}
+		onseeked={() => {
+			meter.reset();
+			loop.report();
+		}}
 		onended={() => loop.onEnded()}
 		onerror={() => (failure = 'This video could not be loaded')}
 		onclick={togglePlay}
@@ -171,6 +226,7 @@
 			{#if paused}<PlayIcon size={14} weight="fill" />{:else}<PauseIcon size={14} weight="fill" />{/if}
 		</button>
 		<span class="font-mono text-[11px] tabular-nums">{formatTime(playhead)}</span>
+		<span class="font-mono text-[11px] text-white/60 tabular-nums" title="Frame at {frameRate} fps (, and . step one frame)">f{frameIndexAt(playhead, frameRate)}</span>
 		<span class="flex-1"></span>
 		<button
 			type="button"

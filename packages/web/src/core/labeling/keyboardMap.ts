@@ -21,6 +21,7 @@ export type LabelAction =
   | { kind: "toggleLabel"; labelId: string }
   | { kind: "togglePlay" }
   | { kind: "seek"; seconds: number }
+  | { kind: "stepFrames"; count: number }
   | { kind: "save" }
   | { kind: "skip" }
   | { kind: "clearGroup" }
@@ -37,9 +38,11 @@ export type LabelAction =
   | { kind: "escape" };
 
 export const SEEK_STEP_SECONDS = 2;
+/** Frames moved by Shift + , or . */
+export const FRAME_JUMP = 10;
 
 /** Keys the screen uses itself; a label hotkey on one of these is only reachable by its digit. */
-export const RESERVED_KEYS = ["a", "s", "c", "r", "m", "g", "u", " ", "[", "]", "?"];
+export const RESERVED_KEYS = ["a", "s", "c", "r", "m", "g", "u", " ", "[", "]", "?", ",", ".", "<", ">"];
 
 export function isReservedHotkey(hotkey: string): boolean {
   return RESERVED_KEYS.includes(hotkey.toLowerCase()) || (hotkey >= "1" && hotkey <= "9");
@@ -90,6 +93,20 @@ function arrowAction(press: KeyPress): LabelAction | undefined {
   return { kind: "seek", seconds: direction * SEEK_STEP_SECONDS };
 }
 
+/** `,` and `.` step one frame; with Shift (which some layouts report as `<`, `>`) ten. */
+const FRAME_KEYS: Record<string, number> = { ",": -1, ".": 1, "<": -FRAME_JUMP, ">": FRAME_JUMP };
+
+function frameAction(press: KeyPress): LabelAction | undefined {
+  const count = FRAME_KEYS[press.key];
+  if (count === undefined) {
+    return undefined;
+  }
+  if (press.shiftKey && Math.abs(count) === 1) {
+    return { kind: "stepFrames", count: count * FRAME_JUMP };
+  }
+  return { kind: "stepFrames", count };
+}
+
 function tabAction(press: KeyPress): LabelAction | undefined {
   if (press.key !== "Tab") {
     return undefined;
@@ -130,6 +147,10 @@ export function actionForKey(press: KeyPress, focusedLabels: KeyedLabel[]): Labe
   if (navigation !== undefined) {
     return navigation;
   }
+  const frames = frameAction(press);
+  if (frames !== undefined) {
+    return frames;
+  }
   const tab = tabAction(press);
   if (tab !== undefined) {
     return tab;
@@ -157,14 +178,17 @@ export const KEY_HELP: KeyHelp[] = [
   { keys: ["hotkey"], action: "Toggle the label with that hotkey", compact: false },
   { keys: ["Space"], action: "Play / pause", compact: true },
   { keys: ["←", "→"], action: "Seek 2 s", compact: true },
+  { keys: [",", "."], action: "One frame back / forward", compact: true },
+  { keys: ["Shift", ", ."], action: "Ten frames back / forward", compact: false },
   { keys: ["Enter"], action: "Save and open the next item", compact: true },
   { keys: ["S"], action: "Skip the item", compact: true },
   { keys: ["A"], action: "Accept suggestions of 50 % or more", compact: true },
   { keys: ["C"], action: "Copy labels from the previous scene of this video", compact: true },
-  { keys: ["Backspace"], action: "Clear the focused group", compact: false },
-  { keys: ["["], action: "Trim start to the playhead", compact: true },
-  { keys: ["]"], action: "Trim end to the playhead", compact: true },
+  { keys: ["Backspace"], action: "Delete the selected range, else clear the focused group", compact: false },
+  { keys: ["["], action: "Selected range (else the item) starts at the playhead", compact: true },
+  { keys: ["]"], action: "Selected range (else the item) ends at the playhead", compact: true },
   { keys: ["R"], action: "Start / end a range for the focused label", compact: true },
+  { keys: ["Esc"], action: "Deselect the range, stop looping it", compact: false },
   { keys: ["U"], action: "Mark the focused group (not) reviewed", compact: false },
   { keys: ["G"], action: "Show / hide More groups", compact: false },
   { keys: ["M"], action: "Mute / unmute", compact: false },

@@ -12,9 +12,11 @@
 		paused: true,
 		muted: true,
 		playbackRate: 1,
+		frameRate: 1,
 		play: () => undefined,
 		pause: () => undefined,
 		seek: () => undefined,
+		stepFrames: () => undefined,
 		setMuted: () => undefined,
 		setPlaybackRate: () => undefined
 	};
