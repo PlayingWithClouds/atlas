@@ -98,13 +98,31 @@ function overlaps(first: Range, second: Range): boolean {
   return first.start < second.end && second.start < first.end;
 }
 
-/** The ranges that remain once `added` is in; in a single group it replaces whatever it overlaps. */
+/**
+ * The ranges that remain once `added` is in: in a single group it replaces whatever it overlaps;
+ * in both kinds it merges with the same label's ranges it overlaps or touches.
+ */
 function rangesWith(group: Group, ranges: Range[], added: Range): Range[] {
   if (group.kind === "multi") {
-    return [...ranges, added];
+    return mergedWith(ranges, added);
   }
   const kept = ranges.filter((range) => range.group !== group.id || !overlaps(range, added));
-  return [...kept, added];
+  return mergedWith(kept, added);
+}
+
+function mergedWith(ranges: Range[], added: Range): Range[] {
+  const touching = ranges.filter(
+    (range) => range.group === added.group && range.label === added.label && range.start <= added.end && added.start <= range.end,
+  );
+  if (touching.length === 0) {
+    return [...ranges, added];
+  }
+  const merged = {
+    ...added,
+    start: Math.min(added.start, ...touching.map((range) => range.start)),
+    end: Math.max(added.end, ...touching.map((range) => range.end)),
+  };
+  return [...ranges.filter((range) => !touching.includes(range)), merged];
 }
 
 function findGroup(taxonomy: Taxonomy, groupId: string): Group | undefined {

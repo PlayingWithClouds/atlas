@@ -192,3 +192,25 @@ describe('open ranges', () => {
     expect(restartPending([{ ...talking, start: 2 }, { ...dancing, start: 3 }], 7).map((open) => open.start)).toEqual([7, 7]);
   });
 });
+
+describe('adding a range of a label that is already there', () => {
+  test('in a multi group it merges with overlapping or touching ranges of that label', () => {
+    let draft = addRange(taxonomy, emptyDraft(), { ...talking, start: 2, end: 5 });
+    draft = addRange(taxonomy, draft, { group: 'activity', label: 'dancing', start: 3, end: 4 });
+    draft = addRange(taxonomy, draft, { ...talking, start: 1, end: 9 });
+    draft = addRange(taxonomy, draft, { ...talking, start: 9, end: 12 });
+    expect(draft.ranges).toEqual([
+      { group: 'activity', label: 'dancing', start: 3, end: 4 },
+      { ...talking, start: 1, end: 12 },
+    ]);
+  });
+});
+
+describe('adding next to a range of the same label in a single group', () => {
+  test('touching ranges of one label become one; other labels are replaced where overlapped', () => {
+    const standing = { group: 'position', label: 'standing' };
+    let draft = addRange(taxonomy, emptyDraft(), { ...standing, start: 2, end: 5 });
+    draft = addRange(taxonomy, draft, { ...standing, start: 5, end: 8 });
+    expect(draft.ranges.filter((range) => range.group === 'position')).toEqual([{ ...standing, start: 2, end: 8 }]);
+  });
+});
