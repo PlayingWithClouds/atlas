@@ -9,22 +9,32 @@
 		onChange,
 		options,
 		placeholder = 'Select',
-		disabled = false
+		disabled = false,
+		searchable = false
 	}: {
 		value: string;
 		onChange: (value: string) => void;
 		options: Option[];
 		placeholder?: string;
 		disabled?: boolean;
+		/** A text field above the options that narrows them; for long lists. */
+		searchable?: boolean;
 	} = $props();
 
 	let open = $state(false);
+	let searchText = $state('');
+	let searchInput = $state<HTMLInputElement>();
 	let root: HTMLElement;
 	let trigger = $state<HTMLButtonElement>();
 	let triggerRect = $state<DOMRect | null>(null);
 	let popoverHeight = $state(0);
 
 	const selected = $derived(options.find((option) => option.value === value));
+	const shownOptions = $derived.by(() => {
+		const needle = searchText.trim().toLowerCase();
+		if (needle === '') return options;
+		return options.filter((option) => option.label.toLowerCase().includes(needle));
+	});
 	const triggerLabel = $derived(selected ? selected.label : placeholder);
 
 	// Position from the live trigger rect and the measured popover height, so a
@@ -43,7 +53,19 @@
 	function toggle() {
 		if (disabled) return;
 		open = !open;
+		searchText = '';
 		if (open && trigger) triggerRect = trigger.getBoundingClientRect();
+	}
+
+	$effect(() => {
+		if (open && searchInput) searchInput.focus();
+	});
+
+	/** Enter picks the first match, so typing a few letters and Enter is enough. */
+	function onSearchKeydown(event: KeyboardEvent) {
+		if (event.key !== 'Enter' || shownOptions.length === 0) return;
+		event.preventDefault();
+		pick(shownOptions[0]);
 	}
 
 	function pick(option: Option) {
@@ -98,7 +120,17 @@
 			role="listbox"
 			tabindex="-1"
 		>
-			{#each options as option (option.value)}
+			{#if searchable}
+				<input
+					bind:this={searchInput}
+					bind:value={searchText}
+					onkeydown={onSearchKeydown}
+					class="input input-sm mb-1"
+					placeholder="Search"
+					aria-label="Search options"
+				/>
+			{/if}
+			{#each shownOptions as option (option.value)}
 				{@const active = option.value === value}
 				<button
 					type="button"

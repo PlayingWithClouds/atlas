@@ -198,15 +198,32 @@ All bodies are JSON. Types are in `packages/contracts/src/schema.ts`, rules in
 | POST | `/api/projects/:project/assets` | `Asset[]` | batch result |
 | POST | `/api/projects/:project/items` | `Item[]` | batch result |
 | POST | `/api/projects/:project/items/delete` | `{ ids: string[] }` | batch result |
-| GET | `/api/projects/:project/items` | `?status=pending\|labeled\|skipped&cursor=&limit=` | `{ items, cursor }` |
+| GET | `/api/projects/:project/items` | `?status=&cursor=&limit=` + filter | `{ items, cursor }` |
 | GET | `/api/projects/:project/items/:item` | | `ItemDetail` |
-| GET | `/api/projects/:project/queue/next` | `?after=<item id>` | `QueueNext` |
+| GET | `/api/projects/:project/queue/next` | `?after=<item id>` + filter | `QueueNext` |
+| GET | `/api/projects/:project/model` | | `ModelOverview` |
 | PUT | `/api/projects/:project/items/:item/annotation` | `AnnotationInput` | `Annotation` |
 | DELETE | `/api/projects/:project/items/:item/annotation` | | `204` |
 | POST | `/api/projects/:project/suggestions` | `Suggestion[]` | batch result |
 | GET | `/api/projects/:project/annotations` | `?since=<cursor>&limit=` | `{ changes: Change[], cursor }` |
 | GET | `/api/settings/:scope` | | settings object, `{}` when unset |
 | PUT | `/api/settings/:scope` | JSON object | the same object |
+
+**Filters** (`ItemFilterQuery`) narrow `GET /items` and `GET /queue/next`; the queue page keeps
+them in its URL, and labeling carries them on, so "next" stays inside the filter.
+
+- `q`: part of the asset title or the item id.
+- `label=group.label`: labeled items with it (whole item or a range); other items whose model
+  suggestion gives it at least 0.5 or has a range with it.
+- `unsure=group` or `group.label`: the model's probability is between 0.25 and 0.75 (for a
+  group: for any of its labels).
+- `sort=order|queue|match`: push order (default, cursor = sequence), queue order, or by the
+  model's probability (`label`: highest first; `unsure`: closest to 0.5 first). The last two page
+  by offset. Each item carries the probability as `match`.
+
+"The model" is the project's `prefillSource` when set, otherwise the source that most recently
+pushed values. `GET /model` counts, per label, labeled items and pending items the model finds
+likely (≥ 0.5) or is unsure about.
 
 ```ts
 interface Project {

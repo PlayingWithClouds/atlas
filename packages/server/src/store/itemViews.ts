@@ -1,5 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { Item, ItemPage, ItemStatus, ItemView, QueueNext } from "@atlas/contracts";
+import { filterConditions, matchExpression, modelJoin, orderTerms } from "./itemFilter";
+import type { ItemFilter } from "./itemFilter";
 
 interface ViewRow {
   sequence: number;
@@ -8,12 +10,13 @@ interface ViewRow {
   asset: string;
   annotation: string | null;
   priority: number | null;
+  match?: number | null;
 }
 
 export interface PageRequest {
-  status?: ItemStatus;
-  /** Sequence of the last item of the previous page. */
-  after: number;
+  filter: ItemFilter;
+  /** Push order: sequence of the last item of the previous page. Other sorts: rows to skip. */
+  cursor: number;
   limit: number;
 }
 
@@ -50,36 +53,57 @@ function viewOf(row: ViewRow): ItemView {
   if (row.annotation !== null) {
     view.annotation = JSON.parse(row.annotation);
   }
+  if (row.match !== undefined && row.match !== null) {
+    view.match = row.match;
+  }
   return view;
 }
 
-function statusCondition(status: ItemStatus | undefined): string {
-  if (status === undefined) {
-    return "";
-  }
-  if (status === "pending") {
-    return "AND annotations.item_id IS NULL";
-  }
-  return `AND annotations.status = '${status}'`;
-}
+const FILTERED_SELECT = `
+  SELECT
+    items.sequence AS sequence,
+    items.sort_start AS sort_start,
+    items.data AS item,
+    assets.data AS asset,
+    annotations.data AS annotation,
+    (SELECT MAX(suggestions.priority) FROM suggestions
+       WHERE suggestions.project_id = items.project_id AND suggestions.item_id = items.id) AS priority,
+    MATCH_EXPRESSION AS match
+  FROM items
+  JOIN assets ON assets.project_id = items.project_id AND assets.id = items.asset_id
+  LEFT JOIN annotations ON annotations.project_id = items.project_id AND annotations.item_id = items.id
+  MODEL_JOIN
+`;
 
 /** Read side of the store: items joined with their asset, annotation and best suggestion priority. */
 export class ItemViews {
   constructor(private readonly database: Database) {}
 
   page(projectId: string, request: PageRequest): ItemPage {
-    const rows = this.database
-      .query(
-        `${VIEW_SELECT} WHERE items.project_id = ? AND items.sequence > ? ${statusCondition(request.status)}
-         ORDER BY items.sequence LIMIT ?`,
-      )
-      .all(projectId, request.after, request.limit + 1) as ViewRow[];
+    const rows = this.filteredRows(projectId, request);
     const pageRows = rows.slice(0, request.limit);
     const page: ItemPage = { items: pageRows.map(viewOf) };
     if (rows.length > request.limit) {
-      page.cursor = String(pageRows[pageRows.length - 1].sequence);
+      page.cursor = nextCursor(request, pageRows);
     }
     return page;
+  }
+
+  /** One row more than the limit, so the caller knows whether a next page exists. */
+  private filteredRows(projectId: string, request: PageRequest): ViewRow[] {
+    const match = matchExpression(request.filter);
+    const join = modelJoin(request.filter);
+    const conditions = filterConditions(request.filter);
+    const select = FILTERED_SELECT.replace("MATCH_EXPRESSION", match.sql).replace("MODEL_JOIN", join.sql);
+    const params = [...match.params, ...join.params, projectId];
+    if (request.filter.sort === "order") {
+      return this.database
+        .query(`${select} WHERE items.project_id = ? AND items.sequence > ? ${conditions.sql} ORDER BY sequence LIMIT ?`)
+        .all(...params, request.cursor, ...conditions.params, request.limit + 1) as ViewRow[];
+    }
+    return this.database
+      .query(`${select} WHERE items.project_id = ? ${conditions.sql} ORDER BY ${orderTerms(request.filter)} LIMIT ? OFFSET ?`)
+      .all(...params, ...conditions.params, request.limit + 1, request.cursor) as ViewRow[];
   }
 
   get(projectId: string, itemId: string): ItemView | undefined {
@@ -110,9 +134,9 @@ export class ItemViews {
   }
 
   /** Pending items by highest suggestion priority, items without priority last, then push order. */
-  queueNext(projectId: string, after: string | undefined): QueueNext {
+  queueNext(projectId: string, after: string | undefined, filter: ItemFilter): QueueNext {
     const pending = this.countPending(projectId);
-    const nextId = this.nextPendingId(projectId, excludedItemId(after));
+    const nextId = this.nextPendingId(projectId, excludedItemId(after), filter);
     if (nextId === undefined) {
       return { pending };
     }
@@ -124,7 +148,9 @@ export class ItemViews {
   }
 
   /** Sorts ids only: carrying the JSON columns through the sort made this ~15x slower. */
-  private nextPendingId(projectId: string, excludedId: string): string | undefined {
+  private nextPendingId(projectId: string, excludedId: string, filter: ItemFilter): string | undefined {
+    const join = modelJoin(filter);
+    const conditions = filterConditions({ ...filter, status: "pending" });
     const row = this.database
       .query(
         `WITH best AS (
@@ -134,10 +160,11 @@ export class ItemViews {
          JOIN assets ON assets.project_id = items.project_id AND assets.id = items.asset_id
          LEFT JOIN annotations ON annotations.project_id = items.project_id AND annotations.item_id = items.id
          LEFT JOIN best ON best.item_id = items.id
-         WHERE items.project_id = ? AND annotations.item_id IS NULL AND items.id != ?
+         ${join.sql}
+         WHERE items.project_id = ? AND items.id != ? ${conditions.sql}
          ORDER BY best.priority IS NULL, best.priority DESC, items.sequence LIMIT 1`,
       )
-      .get(projectId, projectId, excludedId) as { id: string } | null;
+      .get(projectId, ...join.params, projectId, excludedId, ...conditions.params) as { id: string } | null;
     if (row === null) {
       return undefined;
     }
@@ -193,4 +220,11 @@ function excludedItemId(after: string | undefined): string {
     return "";
   }
   return after;
+}
+
+function nextCursor(request: PageRequest, pageRows: ViewRow[]): string {
+  if (request.filter.sort === "order") {
+    return String(pageRows[pageRows.length - 1].sequence);
+  }
+  return String(request.cursor + pageRows.length);
 }

@@ -1,12 +1,17 @@
 <script lang="ts">
-	import type { AnnotationInput, ItemPage, ItemStatus, ItemView, QueueNext } from '@atlas/contracts';
+	import type { AnnotationInput, ItemPage, ItemStatus, ItemView, Project, QueueNext, Taxonomy } from '@atlas/contracts';
 	import { onMount, untrack } from 'svelte';
 	import { kernelContext } from '../../kernel/context';
 	import EmptyState from '../../lib/components/EmptyState.svelte';
+	import Select from '../../lib/components/Select.svelte';
 	import { messageOf } from '../shared/errors';
 	import PageHeader from '../shared/PageHeader.svelte';
 	import ItemCard from './ItemCard.svelte';
-	import { apiItemPath, labelPath } from './itemLink';
+	import { currentFilter, filterSearch, groupOptions, hasFilter, labelOptions } from './itemFilter';
+	import type { QueueFilter } from './itemFilter';
+	import { apiItemPath, labelPath, queuePath } from './itemLink';
+	import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlass';
+	import XIcon from 'phosphor-svelte/lib/X';
 	import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwise';
 	import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlash';
 	import PlayIcon from 'phosphor-svelte/lib/Play';
@@ -19,6 +24,12 @@
 
 	const PAGE_SIZE = 48;
 	const RELOAD_DELAY_MS = 300;
+	const SEARCH_DELAY_MS = 250;
+	const SORTS = [
+		{ value: 'order', label: 'Push order' },
+		{ value: 'queue', label: 'Queue order' },
+		{ value: 'match', label: 'Best match' }
+	];
 	const FILTERS: { value: Filter; label: string }[] = [
 		{ value: 'all', label: 'All' },
 		{ value: 'pending', label: 'Pending' },
@@ -29,6 +40,11 @@
 	const ctx = kernelContext();
 
 	let filter = $state<Filter>('pending');
+	/** Search, label, unsure and sort; mirrored into the page URL so labeling keeps it. */
+	let narrowing = $state<QueueFilter>(currentFilter());
+	let searchText = $state(initialSearchText());
+	let searchTimer: ReturnType<typeof setTimeout> | undefined;
+	let taxonomy = $state<Taxonomy | undefined>(undefined);
 	let page = $state<ItemPage>({ items: [] });
 	/** Cursor that opened each earlier page; the first page has none. */
 	let earlierCursors = $state<(string | undefined)[]>([]);
@@ -58,15 +74,73 @@
 		return `${summary.items} items · ${pendingCount} pending · ${summary.labeled} labeled · ${summary.skipped} skipped`;
 	});
 
+	const narrowed = $derived(hasFilter(narrowing));
+	const labelChoices = $derived.by(() => {
+		if (taxonomy === undefined) return [];
+		return [{ value: '', label: 'Any label' }, ...labelOptions(taxonomy)];
+	});
+	const unsureChoices = $derived.by(() => {
+		if (taxonomy === undefined) return [];
+		return [{ value: '', label: 'Anything' }, ...groupOptions(taxonomy), ...labelOptions(taxonomy)];
+	});
+
+	function initialSearchText(): string {
+		const search = currentFilter().q;
+		if (search === undefined) {
+			return '';
+		}
+		return search;
+	}
+
 	function itemsQuery(): string {
-		const query = new URLSearchParams({ limit: String(PAGE_SIZE) });
+		const extra: Record<string, string> = { limit: String(PAGE_SIZE) };
 		if (filter !== 'all') {
-			query.set('status', filter);
+			extra.status = filter;
 		}
 		if (currentCursor !== undefined) {
-			query.set('cursor', currentCursor);
+			extra.cursor = currentCursor;
 		}
-		return query.toString();
+		return filterSearch(narrowing, extra).slice(1);
+	}
+
+	/** Applies a filter change: the URL follows, the list starts again at page 1. */
+	function narrow(change: QueueFilter) {
+		const next: QueueFilter = { ...narrowing, ...change };
+		const narrowsByModel = Boolean(change.label) || Boolean(change.unsure);
+		if (narrowsByModel && next.sort === undefined) {
+			next.sort = 'match';
+		}
+		narrowing = next;
+		history.replaceState(null, '', queuePath(projectId) + filterSearch(narrowing));
+		clearSelection();
+		firstPage();
+	}
+
+	function onSearchInput() {
+		clearTimeout(searchTimer);
+		searchTimer = setTimeout(() => narrow({ q: searchText.trim() }), SEARCH_DELAY_MS);
+	}
+
+	function clearNarrowing() {
+		searchText = '';
+		narrowing = {};
+		narrow({});
+	}
+
+	async function loadTaxonomy() {
+		try {
+			const project = await ctx.api.get<Project>(`/projects/${encodeURIComponent(projectId)}`);
+			taxonomy = project.taxonomy;
+		} catch (failure) {
+			error = messageOf(failure);
+		}
+	}
+
+	function selectValue(value: string | undefined, fallback: string): string {
+		if (value === undefined) {
+			return fallback;
+		}
+		return value;
 	}
 
 	async function load() {
@@ -196,12 +270,14 @@
 	async function startLabeling() {
 		starting = true;
 		try {
-			const next = await ctx.api.get<QueueNext>(`/projects/${encodeURIComponent(projectId)}/queue/next`);
+			const next = await ctx.api.get<QueueNext>(
+				`/projects/${encodeURIComponent(projectId)}/queue/next${filterSearch(narrowing)}`
+			);
 			if (next.item === undefined) {
-				ctx.toasts.push('Nothing pending: the queue is empty', 'info');
+				ctx.toasts.push(emptyQueueMessage(), 'info');
 				return;
 			}
-			ctx.router.navigate(labelPath(projectId, next.item.item.id));
+			ctx.router.navigate(labelPath(projectId, next.item.item.id) + filterSearch(narrowing));
 		} catch (failure) {
 			ctx.toasts.push(messageOf(failure), 'error');
 		} finally {
@@ -209,15 +285,29 @@
 		}
 	}
 
+	function emptyQueueMessage(): string {
+		if (narrowed) {
+			return 'Nothing pending matches these filters';
+		}
+		return 'Nothing pending: the queue is empty';
+	}
+
 	$effect(() => {
 		void projectId;
-		untrack(() => firstPage());
+		untrack(() => {
+			firstPage();
+			void loadTaxonomy();
+		});
 	});
 
 	onMount(() => {
 		const unsubscribe = ctx.live.subscribe((signal) => {
 			if (signal.type === 'connected') {
 				scheduleReload();
+				return;
+			}
+			if (signal.type === 'taxonomy' && signal.projectId === projectId) {
+				taxonomy = signal.taxonomy;
 				return;
 			}
 			if (signal.type === 'projects' || signal.type === 'taxonomy' || signal.type === 'settings') return;
@@ -228,6 +318,7 @@
 		return () => {
 			unsubscribe();
 			clearTimeout(reloadTimer);
+			clearTimeout(searchTimer);
 		};
 	});
 </script>
@@ -238,7 +329,8 @@
 	<PageHeader title="Queue" {subtitle}>
 		{#snippet actions()}
 			<button type="button" class="btn btn-primary" disabled={starting || pendingCount === 0} onclick={startLabeling}>
-				<PlayIcon size={14} weight="fill" /> Start labeling
+				<PlayIcon size={14} weight="fill" />
+				{#if narrowed}Label these{:else}Start labeling{/if}
 			</button>
 		{/snippet}
 	</PageHeader>
@@ -281,18 +373,54 @@
 		</div>
 	</div>
 
+	<div class="mb-4 flex flex-wrap items-center gap-2">
+		<label class="relative w-64">
+			<span class="text-faint pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"><MagnifyingGlassIcon size={14} /></span>
+			<input
+				class="input input-sm pl-8"
+				placeholder="Search titles and ids"
+				bind:value={searchText}
+				oninput={onSearchInput}
+				aria-label="Search"
+			/>
+		</label>
+		<div class="flex items-center gap-1.5">
+			<span class="text-dim text-xs" title="Labeled with it, or the model gives it at least 50%">Label</span>
+			<div class="w-56">
+				<Select value={selectValue(narrowing.label, '')} options={labelChoices} onChange={(value) => narrow({ label: value })} placeholder="Any label" searchable />
+			</div>
+		</div>
+		<div class="flex items-center gap-1.5">
+			<span class="text-dim text-xs" title="The model's probability is between 25% and 75%">Model unsure about</span>
+			<div class="w-56">
+				<Select value={selectValue(narrowing.unsure, '')} options={unsureChoices} onChange={(value) => narrow({ unsure: value })} placeholder="Anything" searchable />
+			</div>
+		</div>
+		<div class="w-36">
+			<Select value={selectValue(narrowing.sort, 'order')} options={SORTS} onChange={(value) => narrow({ sort: value })} />
+		</div>
+		{#if narrowed}
+			<button type="button" class="btn btn-ghost btn-sm" onclick={clearNarrowing}><XIcon size={13} /> Clear filters</button>
+		{/if}
+	</div>
+
 	{#if error}<div class="alert alert-error mb-3">{error}</div>{/if}
 
 	{#if loading}
 		<div class="text-dim flex justify-center py-16"><span class="loading"></span></div>
 	{:else if page.items.length === 0}
-		<EmptyState title="No items here" hint="Adapters push items to /api/projects/{projectId}/items; they show up here live." />
+		{#if narrowed}
+			<EmptyState title="Nothing matches" hint="Loosen the filters above, or clear them." />
+		{:else}
+			<EmptyState title="No items here" hint="Adapters push items to /api/projects/{projectId}/items; they show up here live." />
+		{/if}
 	{:else}
 		<div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr))">
 			{#each page.items as view (view.item.id)}
 				<ItemCard
 					{projectId}
 					{view}
+					search={filterSearch(narrowing)}
 					selected={selectedIds.includes(view.item.id)}
 					selecting={selectedIds.length > 0}
 					onselect={(extend) => toggleSelected(view.item.id, extend)}

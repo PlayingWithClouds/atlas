@@ -1,6 +1,7 @@
 import type { Context } from "@neoworks/extension-system";
 import { HttpError } from "@atlas/contracts/server";
 import type { RouteHandler } from "@atlas/contracts/server";
+import type { ItemFilterQueryText } from "./itemsService";
 import type { StoreCore } from "./store";
 
 async function readJson(request: Request): Promise<unknown> {
@@ -17,6 +18,17 @@ function queryOf(request: Request, name: string): string | undefined {
     return undefined;
   }
   return value;
+}
+
+/** Raw filter parameters; ItemsService validates them against the taxonomy. */
+function filterQueryOf(request: Request): ItemFilterQueryText {
+  return {
+    status: queryOf(request, "status"),
+    q: queryOf(request, "q"),
+    label: queryOf(request, "label"),
+    unsure: queryOf(request, "unsure"),
+    sort: queryOf(request, "sort"),
+  };
 }
 
 function register(ctx: Context, method: string, pattern: string, handler: RouteHandler): void {
@@ -53,15 +65,16 @@ function registerPushRoutes(ctx: Context, store: StoreCore): void {
 function registerReadRoutes(ctx: Context, store: StoreCore): void {
   register(ctx, "GET", "/:project/items", (request, params) =>
     store.items.list(params.project, {
-      status: queryOf(request, "status"),
+      ...filterQueryOf(request),
       cursor: queryOf(request, "cursor"),
       limit: queryOf(request, "limit"),
     }),
   );
   register(ctx, "GET", "/:project/items/:item", (_request, params) => store.items.detail(params.project, params.item));
   register(ctx, "GET", "/:project/queue/next", (request, params) =>
-    store.items.queueNext(params.project, queryOf(request, "after")),
+    store.items.queueNext(params.project, queryOf(request, "after"), filterQueryOf(request)),
   );
+  register(ctx, "GET", "/:project/model", (_request, params) => store.items.modelOverview(params.project));
 }
 
 function registerAnnotationRoutes(ctx: Context, store: StoreCore): void {
