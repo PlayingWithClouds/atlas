@@ -151,28 +151,48 @@ export function valuesPath(group: string, label?: string): string {
   return `$.values."${group}"."${label}"`;
 }
 
-/**
- * LEFT JOIN of the model's suggestion as `model`, and with `similar` or `like` an inner join of
- * the search's answer as `semantic` (items it did not find drop out).
- */
+/** LEFT JOIN of the model's suggestion as `model`. */
 export function modelJoin(filter: ItemFilter): SqlPart {
-  const model = {
+  return {
     sql: `LEFT JOIN suggestions AS model
             ON model.project_id = items.project_id AND model.item_id = items.id AND model.source = ?`,
     params: [modelSourceOf(filter)],
   };
+}
+
+/**
+ * With `similar` or `like`: the search's answer as the CTE `semantic`, to put in a WITH clause.
+ * Materialized, and read first by itemsFrom: joined from the items side, SQLite scanned the whole
+ * answer once per item (20 s for 2000 found items instead of a few ms).
+ */
+export function searchTable(filter: ItemFilter): SqlPart | undefined {
   if (!isSearch(filter)) {
-    return model;
+    return undefined;
   }
-  return joinParts([
-    model,
-    {
-      sql: `JOIN (SELECT json_extract(value, '$.itemId') AS item_id, json_extract(value, '$.score') AS score,
-                         json_extract(value, '$.at') AS at
-                  FROM json_each(?)) AS semantic ON semantic.item_id = items.id`,
-      params: [JSON.stringify(similarItemsOf(filter))],
-    },
-  ]);
+  return {
+    sql: `semantic AS MATERIALIZED (
+            SELECT json_extract(value, '$.itemId') AS item_id, json_extract(value, '$.score') AS score,
+                   json_extract(value, '$.at') AS at
+            FROM json_each(?))`,
+    params: [JSON.stringify(similarItemsOf(filter))],
+  };
+}
+
+/** `WITH …` for the given CTEs (absent ones left out), or nothing. */
+export function withClause(tables: (SqlPart | undefined)[]): SqlPart {
+  const present = tables.filter((table): table is SqlPart => table !== undefined);
+  if (present.length === 0) {
+    return { sql: "", params: [] };
+  }
+  return { sql: `WITH ${present.map((table) => table.sql).join(",\n")}`, params: present.flatMap((table) => table.params) };
+}
+
+/** The FROM of item queries: a search's answer drives them (items it did not find drop out). */
+export function itemsFrom(filter: ItemFilter): string {
+  if (isSearch(filter)) {
+    return "FROM semantic CROSS JOIN items ON items.id = semantic.item_id";
+  }
+  return "FROM items";
 }
 
 function similarItemsOf(filter: ItemFilter): SimilarItem[] {
