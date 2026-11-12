@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { Item, ItemPage, ItemStatus, ItemView, QueueNext } from "@atlas/contracts";
-import { filterConditions, matchExpression, modelJoin, orderTerms } from "./itemFilter";
+import { filterConditions, isNarrowed, matchExpression, modelJoin, orderTerms } from "./itemFilter";
 import type { ItemFilter } from "./itemFilter";
 
 interface ViewRow {
@@ -86,7 +86,27 @@ export class ItemViews {
     if (rows.length > request.limit) {
       page.cursor = nextCursor(request, pageRows);
     }
+    if (isNarrowed(request.filter)) {
+      page.total = this.countMatching(projectId, request.filter);
+      page.pending = this.countMatching(projectId, { ...request.filter, status: "pending" });
+    }
     return page;
+  }
+
+  /** Items the filter lets through, status included. */
+  countMatching(projectId: string, filter: ItemFilter): number {
+    const join = modelJoin(filter);
+    const conditions = filterConditions(filter);
+    const row = this.database
+      .query(
+        `SELECT COUNT(*) AS count FROM items
+         JOIN assets ON assets.project_id = items.project_id AND assets.id = items.asset_id
+         LEFT JOIN annotations ON annotations.project_id = items.project_id AND annotations.item_id = items.id
+         ${join.sql}
+         WHERE items.project_id = ? ${conditions.sql}`,
+      )
+      .get(...join.params, projectId, ...conditions.params) as { count: number };
+    return row.count;
   }
 
   /** One row more than the limit, so the caller knows whether a next page exists. */
@@ -162,7 +182,7 @@ export class ItemViews {
          LEFT JOIN best ON best.item_id = items.id
          ${join.sql}
          WHERE items.project_id = ? AND items.id != ? ${conditions.sql}
-         ORDER BY best.priority IS NULL, best.priority DESC, items.sequence LIMIT 1`,
+         ORDER BY ${queueOrder(filter)} LIMIT 1`,
       )
       .get(projectId, ...join.params, projectId, excludedId, ...conditions.params) as { id: string } | null;
     if (row === null) {
@@ -227,4 +247,12 @@ function nextCursor(request: PageRequest, pageRows: ViewRow[]): string {
     return String(pageRows[pageRows.length - 1].sequence);
   }
   return String(request.cursor + pageRows.length);
+}
+
+/** The queue serves by priority; a semantic search serves the most similar first. */
+function queueOrder(filter: ItemFilter): string {
+  if (filter.similar !== undefined) {
+    return "semantic.score DESC, items.sequence";
+  }
+  return "best.priority IS NULL, best.priority DESC, items.sequence";
 }

@@ -62,7 +62,11 @@ const INITIAL_SCHEMA = `
 /** Where the labeling screen asks an adapter for suggestions at one moment (S). */
 const LIVE_SUGGESTIONS = `ALTER TABLE projects ADD COLUMN live_suggestions TEXT;`;
 
+/** Where the queue asks an adapter to rank items by a text query. */
+const SEMANTIC_SEARCH = `ALTER TABLE projects ADD COLUMN semantic_search TEXT;`;
+
 export const STORE_MIGRATIONS: Migration[] = [
   { version: 1, sql: INITIAL_SCHEMA },
   { version: 2, sql: LIVE_SUGGESTIONS },
+  { version: 3, sql: SEMANTIC_SEARCH },
 ];

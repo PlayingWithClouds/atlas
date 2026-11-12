@@ -28,14 +28,15 @@ function readPrefillSource(raw: unknown): string | null | undefined {
   throw new ValidationFailure(["prefillSource must be a string or null"]);
 }
 
-function readLiveSuggestions(raw: unknown): string | null | undefined {
+/** An adapter URL field of a project: http(s), null to clear, absent to keep. */
+function readAdapterUrl(raw: unknown, name: string): string | null | undefined {
   if (raw === undefined || raw === null) {
     return raw;
   }
   if (typeof raw === "string" && /^https?:\/\//.test(raw)) {
     return raw;
   }
-  throw new ValidationFailure(["liveSuggestions must be an http(s) URL or null"]);
+  throw new ValidationFailure([`${name} must be an http(s) URL or null`]);
 }
 
 function undefinedIfNull(value: string | null | undefined): string | undefined {
@@ -105,9 +106,13 @@ export class ProjectsService {
     if (prefillSource !== undefined) {
       this.table.setPrefillSource(projectId, prefillSource);
     }
-    const liveSuggestions = readLiveSuggestions(body.liveSuggestions);
+    const liveSuggestions = readAdapterUrl(body.liveSuggestions, "liveSuggestions");
     if (liveSuggestions !== undefined) {
       this.table.setLiveSuggestions(projectId, liveSuggestions);
+    }
+    const semanticSearch = readAdapterUrl(body.semanticSearch, "semanticSearch");
+    if (semanticSearch !== undefined) {
+      this.table.setSemanticSearch(projectId, semanticSearch);
     }
     this.events.emit({ type: "projects" });
     return this.require(projectId);

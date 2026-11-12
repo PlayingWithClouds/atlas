@@ -46,8 +46,22 @@ describe("item filters", () => {
   });
 
   test("unsure on a group: any of its labels in the band", async () => {
-    const page = await api.get("/api/projects/p/items?unsure=extras");
+    const page = await api.get("/api/projects/p/items?unsure=extras&margin=0.25");
     expect(idsOf(page.body)).toEqual([itemIds[0], itemIds[2]]);
+  });
+
+  test("the default margin is 0.15; others are checked", async () => {
+    const page = await api.get("/api/projects/p/items?unsure=extras");
+    expect(idsOf(page.body)).toEqual([itemIds[0]]);
+    expect((await api.get("/api/projects/p/items?unsure=extras&margin=0.9")).status).toBe(400);
+  });
+
+  test("a narrowed list counts its matches, in the status and pending", async () => {
+    const page = await api.get("/api/projects/p/items?label=position.doggy&limit=1");
+    expect(page.body.items).toHaveLength(1);
+    expect(page.body.total).toBe(3);
+    expect(page.body.pending).toBe(2);
+    expect((await api.get("/api/projects/p/items?limit=1")).body.total).toBeUndefined();
   });
 
   test("sort=queue follows priority and pages by offset", async () => {
@@ -70,17 +84,17 @@ describe("item filters", () => {
   });
 
   test("queue/next serves only items inside the filter", async () => {
-    const next = await api.get("/api/projects/p/queue/next?unsure=extras");
+    const next = await api.get("/api/projects/p/queue/next?unsure=extras&margin=0.25");
     expect(next.body.item.item.id).toBe(itemIds[2]);
-    const after = await api.get(`/api/projects/p/queue/next?unsure=extras&after=${encodeURIComponent(itemIds[2])}`);
+    const after = await api.get(`/api/projects/p/queue/next?unsure=extras&margin=0.25&after=${encodeURIComponent(itemIds[2])}`);
     expect(after.body.item.item.id).toBe(itemIds[0]);
   });
 });
 
 describe("model overview", () => {
   test("counts likely, unsure and labeled per label over pending items", async () => {
-    const overview = (await api.get("/api/projects/p/model")).body;
-    expect(overview).toMatchObject({ source: "model", pending: 4, suggested: 4 });
+    const overview = (await api.get("/api/projects/p/model?margin=0.25")).body;
+    expect(overview).toMatchObject({ source: "model", margin: 0.25, pending: 4, suggested: 4 });
     const position = overview.groups.find((group: { group: string }) => group.group === "position");
     expect(position.unsure).toBe(2);
     expect(position.labels[0]).toEqual({ label: "doggy", labeled: 1, likely: 2, unsure: 2 });
@@ -91,5 +105,35 @@ describe("model overview", () => {
     const overview = (await api.get("/api/projects/empty/model")).body;
     expect(overview.source).toBeUndefined();
     expect(overview.groups[0].labels[0]).toEqual({ label: "doggy", labeled: 0, likely: 0, unsure: 0 });
+  });
+});
+
+describe("semantic search", () => {
+  test("similar keeps the items the adapter ranks, best first, with their score", async () => {
+    const queries: string[] = [];
+    const search = Bun.serve({
+      port: 0,
+      fetch(request) {
+        const url = new URL(request.url);
+        queries.push(`${url.searchParams.get("q")}|${url.searchParams.get("limit")}`);
+        return Response.json({ items: [{ itemId: itemIds[3], score: 0.31 }, { itemId: itemIds[1], score: 0.2 }, { itemId: "unknown", score: 0.1 }] });
+      },
+    });
+    try {
+      await api.patch("/api/projects/p", { semanticSearch: `http://localhost:${search.port}/search` });
+      const page = await api.get("/api/projects/p/items?similar=red%20dress&sort=match");
+      expect(idsOf(page.body)).toEqual([itemIds[3], itemIds[1]]);
+      expect(page.body.items[0].match).toBe(0.31);
+      expect(page.body.total).toBe(2);
+      const next = await api.get("/api/projects/p/queue/next?similar=red%20dress");
+      expect(next.body.item.item.id).toBe(itemIds[3]);
+      expect(queries).toEqual(["red dress|2000"]);
+    } finally {
+      search.stop(true);
+    }
+  });
+
+  test("without a search URL similar is a 400", async () => {
+    expect((await api.get("/api/projects/p/items?similar=x")).status).toBe(400);
   });
 });

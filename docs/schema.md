@@ -193,7 +193,7 @@ All bodies are JSON. Types are in `packages/contracts/src/schema.ts`, rules in
 | GET | `/api/projects` | | `ProjectSummary[]` |
 | POST | `/api/projects` | `ProjectInput` | `Project` |
 | GET | `/api/projects/:project` | | `Project` (with `taxonomy`) |
-| PATCH | `/api/projects/:project` | `{ name?, prefillSource?, liveSuggestions? }` | `Project` |
+| PATCH | `/api/projects/:project` | `{ name?, prefillSource?, liveSuggestions?, semanticSearch? }` | `Project` |
 | PUT | `/api/projects/:project/taxonomy` | `Taxonomy` | `Taxonomy` (new version) |
 | POST | `/api/projects/:project/assets` | `Asset[]` | batch result |
 | POST | `/api/projects/:project/items` | `Item[]` | batch result |
@@ -201,7 +201,7 @@ All bodies are JSON. Types are in `packages/contracts/src/schema.ts`, rules in
 | GET | `/api/projects/:project/items` | `?status=&cursor=&limit=` + filter | `{ items, cursor }` |
 | GET | `/api/projects/:project/items/:item` | | `ItemDetail` |
 | GET | `/api/projects/:project/queue/next` | `?after=<item id>` + filter | `QueueNext` |
-| GET | `/api/projects/:project/model` | | `ModelOverview` |
+| GET | `/api/projects/:project/model` | `?margin=` | `ModelOverview` |
 | PUT | `/api/projects/:project/items/:item/annotation` | `AnnotationInput` | `Annotation` |
 | DELETE | `/api/projects/:project/items/:item/annotation` | | `204` |
 | POST | `/api/projects/:project/suggestions` | `Suggestion[]` | batch result |
@@ -215,11 +215,17 @@ them in its URL, and labeling carries them on, so "next" stays inside the filter
 - `q`: part of the asset title or the item id.
 - `label=group.label`: labeled items with it (whole item or a range); other items whose model
   suggestion gives it at least 0.5 or has a range with it.
-- `unsure=group` or `group.label`: the model's probability is between 0.25 and 0.75 (for a
-  group: for any of its labels).
+- `unsure=group` or `group.label`: the model's probability is within `margin` of 0.5 (for a
+  group: for any of its labels). `margin` defaults to 0.15 and may be 0.05–0.45; the UI sends
+  the "Model counts as unsure within" setting.
+- `similar=<text>`: only items the project's `semanticSearch` adapter returns for the text, with
+  its score as `match`; `sort=match` and `queue/next` serve the most similar first. atlas asks
+  `GET <semanticSearch>?q=<text>&limit=2000` → `{ items: { itemId, score }[] }` (best first,
+  only items worth showing) and keeps the answer five minutes.
 - `sort=order|queue|match`: push order (default, cursor = sequence), queue order, or by the
   model's probability (`label`: highest first; `unsure`: closest to 0.5 first). The last two page
-  by offset. Each item carries the probability as `match`.
+  by offset. Each item carries the probability as `match`. A list narrowed by `q`, `label`,
+`unsure` or `similar` also answers `total` (matches in the status asked for) and `pending`.
 
 "The model" is the project's `prefillSource` when set, otherwise the source that most recently
 pushed values. `GET /model` counts, per label, labeled items and pending items the model finds
@@ -232,6 +238,7 @@ interface Project {
   taxonomy: Taxonomy;
   prefillSource?: string;     // suggestion source used to prefill the labeling screen
   liveSuggestions?: string;   // adapter URL asked for ranges at one moment (S), see below
+  semanticSearch?: string;    // adapter URL that ranks items by a text query (queue search)
 }
 
 interface Change {

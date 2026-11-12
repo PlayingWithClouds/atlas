@@ -8,6 +8,10 @@
 	import PageHeader from '../shared/PageHeader.svelte';
 	import ItemCard from './ItemCard.svelte';
 	import { currentFilter, filterSearch, groupOptions, hasFilter, labelOptions } from './itemFilter';
+	import { apiFilterSearch } from './apiFilter';
+	import MarginSelect from './MarginSelect.svelte';
+	import { settings } from '../settings/settings.svelte';
+	import SparkleIcon from 'phosphor-svelte/lib/Sparkle';
 	import type { QueueFilter } from './itemFilter';
 	import { apiItemPath, labelPath, queuePath } from './itemLink';
 	import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlass';
@@ -25,6 +29,8 @@
 	const PAGE_SIZE = 48;
 	const RELOAD_DELAY_MS = 300;
 	const SEARCH_DELAY_MS = 250;
+	/** Each change of the description asks the adapter; wait for a pause in typing. */
+	const SIMILAR_DELAY_MS = 500;
 	const SORTS = [
 		{ value: 'order', label: 'Push order' },
 		{ value: 'queue', label: 'Queue order' },
@@ -43,6 +49,10 @@
 	/** Search, label, unsure and sort; mirrored into the page URL so labeling keeps it. */
 	let narrowing = $state<QueueFilter>(currentFilter());
 	let searchText = $state(initialSearchText());
+	let similarText = $state(initialSimilarText());
+	let similarTimer: ReturnType<typeof setTimeout> | undefined;
+	/** The adapter can rank items by a description (the project has semanticSearch). */
+	let canSearchScenes = $state(false);
 	let searchTimer: ReturnType<typeof setTimeout> | undefined;
 	let taxonomy = $state<Taxonomy | undefined>(undefined);
 	let page = $state<ItemPage>({ items: [] });
@@ -100,13 +110,44 @@
 		if (currentCursor !== undefined) {
 			extra.cursor = currentCursor;
 		}
-		return filterSearch(narrowing, extra).slice(1);
+		return apiFilterSearch(narrowing, extra).slice(1);
 	}
+
+	function initialSimilarText(): string {
+		const similar = currentFilter().similar;
+		if (similar === undefined) {
+			return '';
+		}
+		return similar;
+	}
+
+	function onSimilarInput() {
+		clearTimeout(similarTimer);
+		similarTimer = setTimeout(() => narrow({ similar: similarText.trim() }), SIMILAR_DELAY_MS);
+	}
+
+	/** "604 match · 412 pending" for a narrowed list. */
+	const matchSummary = $derived.by(() => {
+		if (!narrowed || page.total === undefined) {
+			return '';
+		}
+		return `${page.total} match · ${page.pending} pending`;
+	});
+
+	const labelButtonText = $derived.by(() => {
+		if (!narrowed) {
+			return 'Start labeling';
+		}
+		if (page.pending === undefined) {
+			return 'Label these';
+		}
+		return `Label these ${page.pending}`;
+	});
 
 	/** Applies a filter change: the URL follows, the list starts again at page 1. */
 	function narrow(change: QueueFilter) {
 		const next: QueueFilter = { ...narrowing, ...change };
-		const narrowsByModel = Boolean(change.label) || Boolean(change.unsure);
+		const narrowsByModel = Boolean(change.label) || Boolean(change.unsure) || Boolean(change.similar);
 		if (narrowsByModel && next.sort === undefined) {
 			next.sort = 'match';
 		}
@@ -123,6 +164,7 @@
 
 	function clearNarrowing() {
 		searchText = '';
+		similarText = '';
 		narrowing = {};
 		narrow({});
 	}
@@ -131,6 +173,7 @@
 		try {
 			const project = await ctx.api.get<Project>(`/projects/${encodeURIComponent(projectId)}`);
 			taxonomy = project.taxonomy;
+			canSearchScenes = project.semanticSearch !== undefined;
 		} catch (failure) {
 			error = messageOf(failure);
 		}
@@ -271,7 +314,7 @@
 		starting = true;
 		try {
 			const next = await ctx.api.get<QueueNext>(
-				`/projects/${encodeURIComponent(projectId)}/queue/next${filterSearch(narrowing)}`
+				`/projects/${encodeURIComponent(projectId)}/queue/next${apiFilterSearch(narrowing)}`
 			);
 			if (next.item === undefined) {
 				ctx.toasts.push(emptyQueueMessage(), 'info');
@@ -291,6 +334,17 @@
 		}
 		return 'Nothing pending: the queue is empty';
 	}
+
+	// A new unsure margin changes what an unsure filter lets through.
+	let lastMargin = settings.value.unsureMargin;
+	$effect(() => {
+		const margin = settings.value.unsureMargin;
+		if (margin === lastMargin) return;
+		lastMargin = margin;
+		untrack(() => {
+			if (narrowing.unsure !== undefined) firstPage();
+		});
+	});
 
 	$effect(() => {
 		void projectId;
@@ -319,6 +373,7 @@
 			unsubscribe();
 			clearTimeout(reloadTimer);
 			clearTimeout(searchTimer);
+			clearTimeout(similarTimer);
 		};
 	});
 </script>
@@ -330,7 +385,7 @@
 		{#snippet actions()}
 			<button type="button" class="btn btn-primary" disabled={starting || pendingCount === 0} onclick={startLabeling}>
 				<PlayIcon size={14} weight="fill" />
-				{#if narrowed}Label these{:else}Start labeling{/if}
+				{labelButtonText}
 			</button>
 		{/snippet}
 	</PageHeader>
@@ -374,7 +429,19 @@
 	</div>
 
 	<div class="mb-4 flex flex-wrap items-center gap-2">
-		<label class="relative w-64">
+		{#if canSearchScenes}
+			<label class="relative w-72" title="Scenes ranked by how well a frame matches the description (the adapter's SigLIP embeddings)">
+				<span class="text-violet pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"><SparkleIcon size={14} /></span>
+				<input
+					class="input input-sm pl-8"
+					placeholder="Describe a scene, e.g. kissing by a pool"
+					bind:value={similarText}
+					oninput={onSimilarInput}
+					aria-label="Search scenes by description"
+				/>
+			</label>
+		{/if}
+		<label class="relative w-56">
 			<span class="text-faint pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"><MagnifyingGlassIcon size={14} /></span>
 			<input
 				class="input input-sm pl-8"
@@ -391,16 +458,20 @@
 			</div>
 		</div>
 		<div class="flex items-center gap-1.5">
-			<span class="text-dim text-xs" title="The model's probability is between 25% and 75%">Model unsure about</span>
+			<span class="text-dim text-xs">Model unsure about</span>
 			<div class="w-56">
 				<Select value={selectValue(narrowing.unsure, '')} options={unsureChoices} onChange={(value) => narrow({ unsure: value })} placeholder="Anything" searchable />
 			</div>
+			{#if narrowing.unsure}
+				<MarginSelect />
+			{/if}
 		</div>
 		<div class="w-36">
 			<Select value={selectValue(narrowing.sort, 'order')} options={SORTS} onChange={(value) => narrow({ sort: value })} />
 		</div>
 		{#if narrowed}
 			<button type="button" class="btn btn-ghost btn-sm" onclick={clearNarrowing}><XIcon size={13} /> Clear filters</button>
+			{#if matchSummary}<span class="text-dim ml-auto text-xs">{matchSummary}</span>{/if}
 		{/if}
 	</div>
 

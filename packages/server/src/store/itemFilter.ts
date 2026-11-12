@@ -3,9 +3,10 @@ import { HttpError } from "@atlas/contracts/server";
 
 /** A label the model gives at least this probability counts as suggested (`label` filter). */
 export const LIKELY = 0.5;
-/** Probabilities inside [UNSURE_LOW, UNSURE_HIGH] count as the model being unsure. */
-export const UNSURE_LOW = 0.25;
-export const UNSURE_HIGH = 0.75;
+/** Probabilities within the margin of 0.5 count as the model being unsure. */
+export const DEFAULT_MARGIN = 0.15;
+const MINIMUM_MARGIN = 0.05;
+const MAXIMUM_MARGIN = 0.45;
 
 export type ItemSort = "order" | "queue" | "match";
 
@@ -17,14 +18,52 @@ export interface LabelReference {
   label?: string;
 }
 
-/** A validated filter; `modelSource` is the suggestion source label filters read. */
+/** One item of a semantic search answer. */
+export interface SimilarItem {
+  itemId: string;
+  score: number;
+}
+
+/**
+ * A validated filter. `modelSource` is the suggestion source label filters read; `similarItems`
+ * is the semantic search's answer for `similar`, filled in before the query runs.
+ */
 export interface ItemFilter {
   status?: ItemStatus;
   search?: string;
   label?: { group: string; label: string };
   unsure?: LabelReference;
+  margin: number;
+  similar?: string;
   sort: ItemSort;
   modelSource?: string;
+  similarItems?: SimilarItem[];
+}
+
+export interface UnsureBand {
+  low: number;
+  high: number;
+}
+
+export function bandOf(margin: number): UnsureBand {
+  return { low: 0.5 - margin, high: 0.5 + margin };
+}
+
+/** A margin from the URL; absent means the default, anything outside 0.05–0.45 is a 400. */
+export function readMargin(margin: string | number | undefined): number {
+  if (margin === undefined || margin === "") {
+    return DEFAULT_MARGIN;
+  }
+  const parsed = Number(margin);
+  if (!Number.isFinite(parsed) || parsed < MINIMUM_MARGIN || parsed > MAXIMUM_MARGIN) {
+    throw new HttpError(400, `margin must be between ${MINIMUM_MARGIN} and ${MAXIMUM_MARGIN}`);
+  }
+  return parsed;
+}
+
+/** q, label, unsure or similar is set: the list is narrowed, so counts are worth giving. */
+export function isNarrowed(filter: ItemFilter): boolean {
+  return filter.search !== undefined || filter.label !== undefined || filter.unsure !== undefined || filter.similar !== undefined;
 }
 
 export interface SqlPart {
@@ -38,7 +77,7 @@ export function needsModel(filter: ItemFilter): boolean {
 
 /** Checks a raw query against the taxonomy; unknown groups or labels are a 400. */
 export function readFilter(query: ItemFilterQuery, taxonomy: Taxonomy): ItemFilter {
-  const filter: ItemFilter = { sort: readSort(query.sort) };
+  const filter: ItemFilter = { sort: readSort(query.sort), margin: readMargin(query.margin) };
   const status = readStatus(query.status);
   if (status !== undefined) {
     filter.status = status;
@@ -55,6 +94,9 @@ export function readFilter(query: ItemFilterQuery, taxonomy: Taxonomy): ItemFilt
   }
   if (query.unsure !== undefined && query.unsure !== "") {
     filter.unsure = readReference(query.unsure, taxonomy, "unsure");
+  }
+  if (query.similar !== undefined && query.similar.trim() !== "") {
+    filter.similar = query.similar.trim();
   }
   return filter;
 }
@@ -105,13 +147,34 @@ export function valuesPath(group: string, label?: string): string {
   return `$.values."${group}"."${label}"`;
 }
 
-/** LEFT JOIN of the model's suggestion as `model`; joins nothing when no filter reads it. */
+/**
+ * LEFT JOIN of the model's suggestion as `model`, and with `similar` an inner join of the semantic
+ * search's answer as `semantic` (items it did not rank drop out).
+ */
 export function modelJoin(filter: ItemFilter): SqlPart {
-  return {
+  const model = {
     sql: `LEFT JOIN suggestions AS model
             ON model.project_id = items.project_id AND model.item_id = items.id AND model.source = ?`,
     params: [modelSourceOf(filter)],
   };
+  if (filter.similar === undefined) {
+    return model;
+  }
+  return joinParts([
+    model,
+    {
+      sql: `JOIN (SELECT json_extract(value, '$.itemId') AS item_id, json_extract(value, '$.score') AS score
+                  FROM json_each(?)) AS semantic ON semantic.item_id = items.id`,
+      params: [JSON.stringify(similarItemsOf(filter))],
+    },
+  ]);
+}
+
+function similarItemsOf(filter: ItemFilter): SimilarItem[] {
+  if (filter.similarItems === undefined) {
+    return [];
+  }
+  return filter.similarItems;
 }
 
 function modelSourceOf(filter: ItemFilter): string {
@@ -128,13 +191,16 @@ export function filterConditions(filter: ItemFilter): SqlPart {
     parts.push(labelCondition(filter.label.group, filter.label.label));
   }
   if (filter.unsure !== undefined) {
-    parts.push(unsureCondition(filter.unsure));
+    parts.push(unsureCondition(filter.unsure, bandOf(filter.margin)));
   }
   return joinParts(parts);
 }
 
-/** The model's probability for the filtered label, or NULL. */
+/** The semantic score with `similar`, else the model's probability for the filtered label, or NULL. */
 export function matchExpression(filter: ItemFilter): SqlPart {
+  if (filter.similar !== undefined) {
+    return { sql: "semantic.score", params: [] };
+  }
   if (filter.label !== undefined) {
     return { sql: "json_extract(model.data, ?)", params: [valuesPath(filter.label.group, filter.label.label)] };
   }
@@ -147,7 +213,7 @@ export function matchExpression(filter: ItemFilter): SqlPart {
   return {
     sql: `(SELECT entry.value FROM json_each(model.data, ?) AS entry
            WHERE entry.value BETWEEN ? AND ? ORDER BY ABS(entry.value - 0.5) LIMIT 1)`,
-    params: [valuesPath(filter.unsure.group), UNSURE_LOW, UNSURE_HIGH],
+    params: [valuesPath(filter.unsure.group), bandOf(filter.margin).low, bandOf(filter.margin).high],
   };
 }
 
@@ -159,7 +225,7 @@ export function orderTerms(filter: ItemFilter): string {
   if (filter.sort !== "match") {
     return "sequence";
   }
-  if (filter.label !== undefined) {
+  if (filter.similar !== undefined || filter.label !== undefined) {
     return "match IS NULL, match DESC, sequence";
   }
   if (filter.unsure !== undefined) {
@@ -208,16 +274,16 @@ function rangeHas(table: string): string {
                   WHERE json_extract(range.value, '$.group') = ? AND json_extract(range.value, '$.label') = ?)`;
 }
 
-function unsureCondition(reference: LabelReference): SqlPart {
+function unsureCondition(reference: LabelReference, band: UnsureBand): SqlPart {
   if (reference.label !== undefined) {
     return {
       sql: "AND json_extract(model.data, ?) BETWEEN ? AND ?",
-      params: [valuesPath(reference.group, reference.label), UNSURE_LOW, UNSURE_HIGH],
+      params: [valuesPath(reference.group, reference.label), band.low, band.high],
     };
   }
   return {
     sql: "AND EXISTS (SELECT 1 FROM json_each(model.data, ?) AS entry WHERE entry.value BETWEEN ? AND ?)",
-    params: [valuesPath(reference.group), UNSURE_LOW, UNSURE_HIGH],
+    params: [valuesPath(reference.group), band.low, band.high],
   };
 }
 
