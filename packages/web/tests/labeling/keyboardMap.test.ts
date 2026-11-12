@@ -166,3 +166,12 @@ describe('custom keymaps', () => {
     expect(help.find((entry) => entry.action.startsWith('Started labels hold'))?.keys).toEqual(['; f']);
   });
 });
+
+describe('undo and redo keys', () => {
+  test('Ctrl+Z undoes, Ctrl+Shift+Z and Ctrl+Y redo, Cmd works too', () => {
+    expect(actionForKey(press('z', { ctrlKey: true }), [])).toEqual({ kind: 'undo' });
+    expect(actionForKey(press('Z', { ctrlKey: true, shiftKey: true }), [])).toEqual({ kind: 'redo' });
+    expect(actionForKey(press('y', { ctrlKey: true }), [])).toEqual({ kind: 'redo' });
+    expect(actionForKey(press('z', { metaKey: true }), [])).toEqual({ kind: 'undo' });
+  });
+});

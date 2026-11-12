@@ -222,6 +222,64 @@ export function deleteRange(taxonomy: Taxonomy, draft: Draft, range: Range): Dra
   return pruneInactive(taxonomy, { ...removed, ranges });
 }
 
+/**
+ * Takes [start, end) (item seconds) out of one label: its ranges there are cut back or split, its
+ * refinement ranges there go too, and a label set for the whole item keeps only the parts outside.
+ */
+export function eraseRange(taxonomy: Taxonomy, draft: Draft, target: RangeTarget, start: number, end: number, length: number | undefined): Draft {
+  const erased = { start, end };
+  const refinementIds = refinementIdsOf(taxonomy, target);
+  const ranges = draft.ranges.flatMap((range) => {
+    const isTarget = isLabel(range, target);
+    if (!isTarget && !refinementIds.includes(range.group)) {
+      return [range];
+    }
+    return rangesOutside(range, erased);
+  });
+  let next = { ...draft, ranges };
+  if (valuesOfGroup(draft, target.group).includes(target.label)) {
+    next = splitWholeItem(taxonomy, next, target, erased, length);
+  }
+  const covered = next.ranges.filter((candidate) => isCoveredByParent(taxonomy, next, candidate));
+  return pruneInactive(taxonomy, { ...next, ranges: covered });
+}
+
+/** What is left of `range` outside `erased`: nothing, one piece, or two. */
+function rangesOutside(range: Range, erased: { start: number; end: number }): Range[] {
+  if (range.end <= erased.start || range.start >= erased.end) {
+    return [range];
+  }
+  const pieces: Range[] = [];
+  if (erased.start - range.start >= MIN_RANGE_SECONDS) {
+    pieces.push({ ...range, end: erased.start });
+  }
+  if (range.end - erased.end >= MIN_RANGE_SECONDS) {
+    pieces.push({ ...range, start: erased.end });
+  }
+  return pieces;
+}
+
+/** A whole-item label with a part erased becomes ranges before and after that part. */
+function splitWholeItem(taxonomy: Taxonomy, draft: Draft, target: RangeTarget, erased: { start: number; end: number }, length: number | undefined): Draft {
+  const wholeItem = { group: target.group, label: target.label, start: 0, end: wholeEnd(length, erased.end) };
+  let next = draft;
+  for (const piece of rangesOutside(wholeItem, erased)) {
+    next = addRange(taxonomy, next, piece);
+  }
+  if (valuesOfGroup(next, target.group).includes(target.label)) {
+    const values = { ...next.values, [target.group]: valuesOfGroup(next, target.group).filter((labelId) => labelId !== target.label) };
+    return { ...next, values };
+  }
+  return next;
+}
+
+function wholeEnd(length: number | undefined, erasedEnd: number): number {
+  if (length === undefined) {
+    return erasedEnd;
+  }
+  return length;
+}
+
 /** Swaps a range for its edited copy, taking its refinements along. */
 export function replaceRange(taxonomy: Taxonomy, draft: Draft, previous: Range, next: Range): Draft {
   const replaced = addRange(taxonomy, removeRange(draft, previous), next);

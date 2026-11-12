@@ -329,11 +329,34 @@ export function rangeBetween(target: RangeTarget, first: number, second: number,
  * frame boundary, so dragged edges land exactly where frame stepping left the playhead.
  */
 export function snapTime(seconds: number, playhead: number, tolerance: number, frameRate: number): number {
-  if (Math.abs(seconds - playhead) <= tolerance) {
-    return playhead;
+  return snapToAnchors(seconds, [playhead], tolerance, frameRate);
+}
+
+/**
+ * Pulls a time onto the nearest anchor (playhead, range edges …) within `tolerance` seconds, else
+ * onto the nearest frame boundary.
+ */
+export function snapToAnchors(seconds: number, anchors: number[], tolerance: number, frameRate: number): number {
+  const nearest = nearestAnchor(seconds, anchors, tolerance);
+  if (nearest !== undefined) {
+    return nearest;
   }
   if (frameRate <= 0) {
     return seconds;
   }
   return Math.round(seconds * frameRate) / frameRate;
+}
+
+/** The anchor closest to `seconds`, if one is within `tolerance`. */
+export function nearestAnchor(seconds: number, anchors: number[], tolerance: number): number | undefined {
+  let best: number | undefined;
+  let bestDistance = tolerance;
+  for (const anchor of anchors) {
+    const distance = Math.abs(seconds - anchor);
+    if (distance <= bestDistance) {
+      best = anchor;
+      bestDistance = distance;
+    }
+  }
+  return best;
 }

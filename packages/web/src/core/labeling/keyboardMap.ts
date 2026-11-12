@@ -63,6 +63,8 @@ export type LabelAction =
   | { kind: "search" }
   | { kind: "wholeItem" }
   | { kind: "acceptHere" }
+  | { kind: "undo" }
+  | { kind: "redo" }
   | { kind: "leader" }
   | { kind: "escape" };
 
@@ -109,6 +111,8 @@ export const COMMANDS: Command[] = [
   { id: "accept", action: { kind: "acceptProposals" }, title: "Accept whole-scene proposals of 50 % or more", defaults: ["a"], short: "accept" },
   { id: "copyPrevious", action: { kind: "copyPrevious" }, title: "Copy labels from the previous scene of this video", defaults: ["c"] },
   { id: "clearGroup", action: { kind: "clearGroup" }, title: "Delete the selected range, else clear the focused group", defaults: ["Backspace", "Delete"] },
+  { id: "undo", action: { kind: "undo" }, title: "Undo the last change to the labels", defaults: ["Ctrl+z", "Meta+z"], repeat: true, short: "undo" },
+  { id: "redo", action: { kind: "redo" }, title: "Redo what was undone", defaults: ["Ctrl+Shift+z", "Meta+Shift+z", "Ctrl+y"], repeat: true },
   { id: "escape", action: { kind: "escape" }, title: "Drop started labels, deselect the range, stop looping it", defaults: ["Escape"] },
   { id: "reviewed", action: { kind: "toggleReviewed" }, title: "Mark the focused group (not) reviewed", defaults: ["u"] },
   { id: "mute", action: { kind: "toggleMuted" }, title: "Mute / unmute", defaults: ["m"] },
@@ -318,7 +322,9 @@ const POINTER_HELP: KeyHelp[] = [
   { keys: ["1-9"], action: "Toggle label of the focused group", compact: false },
   { keys: ["hotkey"], action: "Toggle the label with that hotkey", compact: false },
   { keys: ["drag"], action: "In a timeline track: mark the part of the item a label holds for", compact: false },
-  { keys: ["drag"], action: "A bar or its edges: move or resize it (snaps to the playhead)", compact: false },
+  { keys: ["Shift+drag"], action: "In a timeline track: erase that part of the label (splits a bar)", compact: false },
+  { keys: ["drag"], action: "A bar or its edges: move or resize it (snaps to the playhead and other bars' edges)", compact: false },
+  { keys: ["Alt"], action: "Held while hovering or dragging on the timeline: no snapping", compact: false },
   { keys: ["dbl-click"], action: "A bar: loop just that part", compact: false },
   { keys: ["wheel"], action: "Over the timeline: zoom (Shift: scroll sideways)", compact: false },
 ];
