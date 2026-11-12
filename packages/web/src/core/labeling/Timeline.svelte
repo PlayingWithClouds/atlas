@@ -90,7 +90,7 @@
 
 	type Drag =
 		| { kind: 'scrub' }
-		| { kind: 'create'; target: RangeTarget; anchor: number; current: number; startX: number; erase: boolean }
+		| { kind: 'create'; target: RangeTarget; anchor: number; current: number; startX: number; erase: boolean; ghost?: SuggestedRange }
 		| { kind: 'edit'; range: Range; mode: RangeDragMode; origin: number; preview: Range; startX: number; snapTo: number };
 
 	let container = $state<HTMLElement>();
@@ -395,14 +395,20 @@
 		startDrawing(event, track);
 	}
 
-	/** Drawing a range (Shift: an erased part) in a track, from wherever the pointer went down. */
-	function startDrawing(event: PointerEvent, track: LabelTrack): void {
+	/**
+	 * Drawing a range (Shift: an erased part) in a track, from wherever the pointer went down. Down
+	 * on a suggestion it draws too; only a click without moving takes the suggestion.
+	 */
+	function startDrawing(event: PointerEvent, track: LabelTrack, ghost?: SuggestedRange): void {
+		if (event.button !== 0) {
+			return;
+		}
 		event.preventDefault();
 		event.stopPropagation();
 		snapOff = event.altKey;
 		const target = { group: track.group.id, label: track.label.id };
 		const anchor = snapped(secondsAtClientX(event.clientX));
-		drag = { kind: 'create', target, anchor, current: anchor, startX: event.clientX, erase: event.shiftKey };
+		drag = { kind: 'create', target, anchor, current: anchor, startX: event.clientX, erase: event.shiftKey, ghost };
 		follow(
 			(move) => {
 				if (drag?.kind === 'create') {
@@ -418,7 +424,12 @@
 		if (current === undefined || current.kind !== 'create') {
 			return;
 		}
-		if (Math.abs(event.clientX - current.startX) < CLICK_PIXELS) {
+		const isClick = Math.abs(event.clientX - current.startX) < CLICK_PIXELS;
+		if (isClick && current.ghost !== undefined && !current.erase) {
+			onaccept(current.ghost);
+			return;
+		}
+		if (isClick) {
 			onarm(target);
 			onselect(undefined);
 			onseek(pointerSeconds(event.clientX));
@@ -700,9 +711,8 @@
 							type="button"
 							tabindex="-1"
 							onmousedown={(event) => event.preventDefault()}
-							onpointerdown={(event) => event.stopPropagation()}
-							onclick={() => onaccept(ghost)}
-							title="Suggested ({Math.round(ghost.score * 100)} %): click to take it"
+							onpointerdown={(event) => startDrawing(event, track, ghost)}
+							title="Suggested ({Math.round(ghost.score * 100)} %): click to take it; dragging draws as anywhere in the track"
 							class="border-violet text-violet hover:bg-violet/20 absolute inset-y-0.5 overflow-hidden rounded-sm border border-dashed px-1 text-left text-2xs leading-4 whitespace-nowrap"
 							style="left: {left(itemStart + ghost.start)}%; width: {widthBetween(itemStart + ghost.start, itemStart + ghost.end)}%"
 						>
