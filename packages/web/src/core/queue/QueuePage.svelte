@@ -430,14 +430,14 @@
 
 	<div class="mb-4 flex flex-wrap items-center gap-2">
 		{#if canSearchScenes}
-			<label class="relative w-72" title="Scenes ranked by how well a frame matches the description (the adapter's SigLIP embeddings)">
+			<label class="relative w-72" title="Items the project's search adapter finds for the description, best match first">
 				<span class="text-violet pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"><SparkleIcon size={14} /></span>
 				<input
 					class="input input-sm pl-8"
-					placeholder="Describe a scene, e.g. kissing by a pool"
+					placeholder="Describe what to find"
 					bind:value={similarText}
 					oninput={onSimilarInput}
-					aria-label="Search scenes by description"
+					aria-label="Search items by description"
 				/>
 			</label>
 		{/if}
