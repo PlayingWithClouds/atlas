@@ -35,6 +35,7 @@ import type { AutoAdded, LiveAnnotation } from './liveSuggestions';
 import { labelTracks, rangeBetween, rangesFromHere } from './timeline';
 import type { SuggestedRange } from './timeline';
 import { settings } from '../settings/settings.svelte';
+import { browserDraftStore, fitToTaxonomy } from './draftStore';
 
 const NOTICE_LIFETIME_MS = 4000;
 /** Edits in quick succession ask the live endpoint once. */
@@ -108,6 +109,10 @@ export class LabelingSession {
 
   /** Drafts before each edit (undo) and after each undo (redo); both cleared when an item opens. */
   history = $state.raw<{ undo: Draft[]; redo: Draft[] }>({ undo: [], redo: [] });
+  /** Unsaved drafts and per-item histories in the browser (draftStore.ts). */
+  private readonly drafts = browserDraftStore();
+  /** The person changed this item's draft (labels the model added alone do not count). */
+  private personEdited = false;
 
   private loadedFingerprint = $state('');
   private lastTouchedLabel = $state.raw<Record<string, string>>({});
@@ -284,11 +289,63 @@ export class LabelingSession {
     this.loopedRange = undefined;
     this.serverProblems = [];
     this.lastTouchedLabel = {};
-    this.history = { undo: [], redo: [] };
+    this.history = this.storedHistory(project, detail);
+    this.personEdited = false;
+    this.restoreStoredDraft(project, detail);
     this.focusedGroupId = this.focusable[0]?.id;
     this.restartPlayback(sameAsset);
     this.resetLive();
     this.scheduleLive();
+  }
+
+  /** The item's undo history from earlier in this tab, fitted to the taxonomy as it is now. */
+  private storedHistory(project: Project, detail: ItemDetail): { undo: Draft[]; redo: Draft[] } {
+    const stored = this.drafts.loadHistory(project.id, detail.item.id);
+    const fit = (draft: Draft) => fitToTaxonomy(project.taxonomy, draft);
+    return { undo: stored.undo.map(fit), redo: stored.redo.map(fit) };
+  }
+
+  /**
+   * Unsaved changes left by a reload or an earlier visit come back; the saved labels become the
+   * last undo step, so Ctrl+Z shows what is on the server.
+   */
+  private restoreStoredDraft(project: Project, detail: ItemDetail): void {
+    const stored = this.drafts.loadDraft(project.id, detail.item.id);
+    if (stored === undefined) {
+      return;
+    }
+    const restored = fitToTaxonomy(project.taxonomy, stored.draft);
+    if (fingerprintOf(project.taxonomy, restored) === this.loadedFingerprint) {
+      this.drafts.clearDraft(project.id, detail.item.id);
+      return;
+    }
+    this.history = { undo: [...this.history.undo, this.draft].slice(-HISTORY_LIMIT), redo: [] };
+    this.draft = restored;
+    this.personEdited = true;
+    if (stored.base !== annotationBase(detail)) {
+      this.say('Restored unsaved changes; the saved labels changed since (Ctrl+Z shows them)');
+      return;
+    }
+    this.say('Restored unsaved changes (Ctrl+Z shows the saved labels)');
+  }
+
+  /**
+   * Keeps the item's history, and its draft while the person's changes differ from what is saved;
+   * a draft changed only by auto-added labels is not kept (they come back on the next visit).
+   */
+  private persist(): void {
+    const item = this.item;
+    if (item === undefined || this.taxonomy === undefined) {
+      return;
+    }
+    this.drafts.saveHistory(this.projectId(), item.id, this.history);
+    if (this.dirty && this.personEdited) {
+      this.drafts.saveDraft(this.projectId(), item.id, this.draft, annotationBase(this.detail));
+      return;
+    }
+    if (!this.dirty) {
+      this.drafts.clearDraft(this.projectId(), item.id);
+    }
   }
 
   /** A new video loads itself paused at its span start; the same video just jumps to the new scene, paused. */
@@ -409,17 +466,28 @@ export class LabelingSession {
     this.remember(before);
     this.serverProblems = [];
     this.scheduleLive();
+    if (this.draft !== before) {
+      this.personEdited = true;
+    }
+    this.persist();
   }
 
-  /** Records `before` as an undo step when the draft really changed (not just a panel toggle). */
-  private remember(before: Draft): void {
+  /**
+   * Records `before` as an undo step when the draft really changed (not just a panel toggle).
+   * The person's edits end what could be redone; labels the model adds alone keep it.
+   */
+  private remember(before: Draft, keepRedo = false): void {
     if (this.taxonomy === undefined || before === this.draft) {
       return;
     }
     if (fingerprintOf(this.taxonomy, before) === fingerprintOf(this.taxonomy, this.draft)) {
       return;
     }
-    this.history = { undo: [...this.history.undo, before].slice(-HISTORY_LIMIT), redo: [] };
+    let redo: Draft[] = [];
+    if (keepRedo) {
+      redo = this.history.redo;
+    }
+    this.history = { undo: [...this.history.undo, before].slice(-HISTORY_LIMIT), redo };
   }
 
   undo(): void {
@@ -445,9 +513,11 @@ export class LabelingSession {
   /** Puts a draft from the history back; a selection or loop of a range that is gone ends. */
   private restore(draft: Draft): void {
     this.draft = draft;
+    this.personEdited = true;
     this.dropStaleSelection();
     this.serverProblems = [];
     this.scheduleLive();
+    this.persist();
   }
 
   private dropStaleSelection(): void {
@@ -855,6 +925,7 @@ export class LabelingSession {
     try {
       await this.ctx.api.put(`${apiItemPath(this.projectId(), this.item.id)}/annotation`, input);
       this.loadedFingerprint = fingerprintOf(this.taxonomy, this.draft);
+      this.persist();
       await this.openNext(this.item.id);
     } catch (failure) {
       this.serverProblems = problemsOf(failure);
@@ -1090,8 +1161,9 @@ export class LabelingSession {
       next = addRange(this.taxonomy, next, range);
     }
     this.draft = next;
-    this.remember(before);
+    this.remember(before, true);
     this.rememberAutoAdded(before, next);
+    this.persist();
     this.say(addedMessage(count));
   }
 
@@ -1121,4 +1193,12 @@ function finishedMessage(filter: QueueFilter): string {
     return 'Filter finished: nothing pending matches it anymore';
   }
   return 'Queue finished: nothing pending is left';
+}
+
+/** `updatedAt` of the item's saved annotation, which a stored draft started from; null without one. */
+function annotationBase(detail: ItemDetail | undefined): string | null {
+  if (detail === undefined || detail.annotation === undefined) {
+    return null;
+  }
+  return detail.annotation.updatedAt;
 }

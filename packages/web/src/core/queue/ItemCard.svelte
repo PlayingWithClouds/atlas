@@ -4,6 +4,7 @@
 	import StatusChip from '../../lib/components/StatusChip.svelte';
 	import { formatSpan } from '../shared/time';
 	import { labelPath } from './itemLink';
+	import { browserDraftStore } from '../labeling/draftStore';
 	import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwise';
 	import CheckIcon from 'phosphor-svelte/lib/Check';
 	import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlash';
@@ -32,6 +33,9 @@
 	} = $props();
 
 	const ctx = kernelContext();
+
+	/** Unsaved changes wait in this browser (a reload or leaving without saving). */
+	const hasDraft = $derived(browserDraftStore().loadDraft(projectId, view.item.id) !== undefined);
 
 	const media = $derived(ctx.mediaPlayers.list().find((candidate) => candidate.kind === view.asset.kind));
 	const poster = $derived.by(() => {
@@ -109,6 +113,7 @@
 		<div class="text-default truncate text-sm font-medium" title={title}>{title}</div>
 		<div class="flex items-center gap-2">
 			<StatusChip status={view.status} />
+			{#if hasDraft}<span class="badge bg-amber-soft text-amber" title="Unsaved changes in this browser: open it to continue">draft</span>{/if}
 			{#if view.item.span}
 				<span class="text-dim font-mono text-2xs">{formatSpan(view.item.span)}</span>
 			{/if}
