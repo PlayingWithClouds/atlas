@@ -78,6 +78,11 @@ export interface MediaPlayerProps {
   span?: Span;
   /** Still shown before playback (the item's own poster); falls back to the asset's. */
   poster?: string;
+  /**
+   * Asset seconds to open at instead of the span start (e.g. where a search matched); ignored
+   * outside the span. Players without a timeline ignore it.
+   */
+  start?: number;
   /** Called once the handle is usable. */
   onready?(handle: PlayerHandle): void;
   /** Called while the playhead moves and after seeks, with asset seconds. */

@@ -125,6 +125,8 @@
 			canRedo={session.history.redo.length > 0}
 			onundo={() => session.undo()}
 			onredo={() => session.redo()}
+			canFindSimilar={session.canFindSimilar}
+			onfindsimilar={() => session.findSimilar()}
 			onleave={() => session.leave()}
 			onneighbour={(offset) => session.openNeighbour(offset)}
 		/>
@@ -133,7 +135,7 @@
 			<div class="flex min-w-0 flex-1 flex-col gap-3 pb-1">
 				<div class="relative min-h-0 flex-1 overflow-hidden bg-black">
 					{#if media}
-						<media.player asset={detail.asset} span={session.playSpan} poster={detail.item.poster} onready={(handle) => session.setHandle(handle)} ontime={(seconds) => (session.playhead = seconds)} />
+						<media.player asset={detail.asset} span={session.playSpan} start={session.startAt} poster={detail.item.poster} onready={(handle) => session.setHandle(handle)} ontime={(seconds) => (session.playhead = seconds)} />
 						{#if media.frame && lastPreviewSeconds !== undefined}
 							<div class="pointer-events-none absolute inset-0 z-10 bg-black {previewSeconds === undefined ? 'invisible' : ''}">
 								<media.frame asset={detail.asset} seconds={lastPreviewSeconds} />

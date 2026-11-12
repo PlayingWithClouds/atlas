@@ -1,7 +1,7 @@
 import type { ItemFilterQuery, Taxonomy } from '@atlas/contracts';
 
 /** URL parameters that narrow the queue; they travel from the queue into labeling and back. */
-const FILTER_KEYS = ['q', 'similar', 'label', 'unsure', 'sort'] as const;
+const FILTER_KEYS = ['q', 'similar', 'like', 'label', 'unsure', 'sort'] as const;
 
 export type FilterKey = (typeof FILTER_KEYS)[number];
 export type QueueFilter = Partial<Record<FilterKey, string>>;
@@ -24,7 +24,8 @@ export function currentFilter(): QueueFilter {
 }
 
 export function hasFilter(filter: QueueFilter): boolean {
-	return filter.q !== undefined || filter.similar !== undefined || filter.label !== undefined || filter.unsure !== undefined;
+	const keys: FilterKey[] = ['q', 'similar', 'like', 'label', 'unsure'];
+	return keys.some((key) => filter[key] !== undefined);
 }
 
 /** `?label=…&unsure=…` (empty when nothing is set), for page URLs and API calls alike. */

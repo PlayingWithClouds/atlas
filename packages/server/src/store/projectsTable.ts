@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type { Group, Project, ProjectSummary, Taxonomy } from "@atlas/contracts";
+import type { Group, Project, ProjectSummary, SemanticSearch, Taxonomy } from "@atlas/contracts";
 
 interface ProjectRow {
   id: string;
@@ -54,9 +54,17 @@ function projectOf(row: ProjectRow): Project {
     project.liveSuggestions = row.live_suggestions;
   }
   if (row.semantic_search !== null) {
-    project.semanticSearch = row.semantic_search;
+    project.semanticSearch = semanticSearchOf(row.semantic_search);
   }
   return project;
+}
+
+/** Stored as JSON; a bare URL (as first stored) is a search by text only. */
+function semanticSearchOf(stored: string): SemanticSearch {
+  if (!stored.startsWith("{")) {
+    return { url: stored, byText: true };
+  }
+  return JSON.parse(stored);
 }
 
 export class ProjectsTable {
@@ -90,8 +98,12 @@ export class ProjectsTable {
     this.database.query("UPDATE projects SET prefill_source = ? WHERE id = ?").run(prefillSource, projectId);
   }
 
-  setSemanticSearch(projectId: string, url: string | null): void {
-    this.database.query("UPDATE projects SET semantic_search = ? WHERE id = ?").run(url, projectId);
+  setSemanticSearch(projectId: string, search: SemanticSearch | null): void {
+    let stored: string | null = null;
+    if (search !== null) {
+      stored = JSON.stringify(search);
+    }
+    this.database.query("UPDATE projects SET semantic_search = ? WHERE id = ?").run(stored, projectId);
   }
 
   setLiveSuggestions(projectId: string, url: string | null): void {

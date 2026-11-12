@@ -1,4 +1,4 @@
-import type { Project, ProjectSummary, Taxonomy } from "@atlas/contracts";
+import type { Project, ProjectSummary, SemanticSearch, Taxonomy } from "@atlas/contracts";
 import { removedIds, validateTaxonomy } from "@atlas/contracts";
 import { HttpError, ValidationFailure } from "@atlas/contracts/server";
 import type { StoreEvents } from "./events";
@@ -37,6 +37,34 @@ function readAdapterUrl(raw: unknown, name: string): string | null | undefined {
     return raw;
   }
   throw new ValidationFailure([`${name} must be an http(s) URL or null`]);
+}
+
+/** `{ url, byText?, byExample? }`, a bare URL (text only), null to clear, or absent to keep. */
+function readSemanticSearch(raw: unknown): SemanticSearch | null | undefined {
+  if (raw === undefined || raw === null) {
+    return raw;
+  }
+  if (typeof raw === "string") {
+    return { url: readAdapterUrl(raw, "semanticSearch") as string, byText: true };
+  }
+  if (!isRecord(raw)) {
+    throw new ValidationFailure(["semanticSearch must be { url, byText?, byExample? }, a URL or null"]);
+  }
+  const url = readAdapterUrl(raw.url, "semanticSearch.url");
+  if (typeof url !== "string") {
+    throw new ValidationFailure(["semanticSearch.url is required"]);
+  }
+  const search: SemanticSearch = { url };
+  for (const field of ["byText", "byExample"] as const) {
+    const value = raw[field];
+    if (value !== undefined && typeof value !== "boolean") {
+      throw new ValidationFailure([`semanticSearch.${field} must be true or false`]);
+    }
+    if (value !== undefined) {
+      search[field] = value;
+    }
+  }
+  return search;
 }
 
 function undefinedIfNull(value: string | null | undefined): string | undefined {
@@ -110,7 +138,7 @@ export class ProjectsService {
     if (liveSuggestions !== undefined) {
       this.table.setLiveSuggestions(projectId, liveSuggestions);
     }
-    const semanticSearch = readAdapterUrl(body.semanticSearch, "semanticSearch");
+    const semanticSearch = readSemanticSearch(body.semanticSearch);
     if (semanticSearch !== undefined) {
       this.table.setSemanticSearch(projectId, semanticSearch);
     }

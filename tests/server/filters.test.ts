@@ -133,6 +133,41 @@ describe("semantic search", () => {
     }
   });
 
+  test("by example: like asks with item=, carries at as matchAt, and needs byExample", async () => {
+    const asked: string[] = [];
+    const search = Bun.serve({
+      port: 0,
+      fetch(request) {
+        asked.push(new URL(request.url).search);
+        return Response.json({ items: [{ itemId: itemIds[2], score: 0.8, at: 23.5 }, { itemId: itemIds[1], score: 0.6, at: "x" }] });
+      },
+    });
+    try {
+      const url = `http://localhost:${search.port}/search`;
+      await api.patch("/api/projects/p", { semanticSearch: { url, byText: true } });
+      expect((await api.get(`/api/projects/p/items?like=${encodeURIComponent(itemIds[0])}`)).status).toBe(400);
+      const project = await api.patch("/api/projects/p", { semanticSearch: { url, byExample: true } });
+      expect(project.body.semanticSearch).toEqual({ url, byExample: true });
+      expect((await api.get("/api/projects/p/items?similar=x")).status).toBe(400);
+      const page = await api.get(`/api/projects/p/items?like=${encodeURIComponent(itemIds[0])}&sort=match`);
+      expect(idsOf(page.body)).toEqual([itemIds[2], itemIds[1]]);
+      expect(page.body.items[0].matchAt).toBe(23.5);
+      expect(page.body.items[1].matchAt).toBeUndefined();
+      const next = await api.get(`/api/projects/p/queue/next?like=${encodeURIComponent(itemIds[0])}`);
+      expect(next.body.item.matchAt).toBe(23.5);
+      expect(asked[0]).toContain(`item=${encodeURIComponent(itemIds[0])}`);
+      expect((await api.get("/api/projects/p/items?like=a&similar=b")).status).toBe(400);
+    } finally {
+      search.stop(true);
+    }
+  });
+
+  test("a bare URL still means search by text", async () => {
+    const project = await api.patch("/api/projects/p", { semanticSearch: "http://localhost:1/search" });
+    expect(project.body.semanticSearch).toEqual({ url: "http://localhost:1/search", byText: true });
+    expect((await api.patch("/api/projects/p", { semanticSearch: { url: "ftp://x" } })).status).toBe(422);
+  });
+
   test("without a search URL similar is a 400", async () => {
     expect((await api.get("/api/projects/p/items?similar=x")).status).toBe(400);
   });

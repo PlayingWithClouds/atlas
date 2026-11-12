@@ -29,6 +29,7 @@ function filterQueryOf(request: Request): ItemFilterQueryText {
     unsure: queryOf(request, "unsure"),
     margin: queryOf(request, "margin"),
     similar: queryOf(request, "similar"),
+    like: queryOf(request, "like"),
     sort: queryOf(request, "sort"),
   };
 }

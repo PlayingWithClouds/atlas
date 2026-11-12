@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { AnnotationInput, ItemPage, ItemStatus, ItemView, Project, QueueNext, Taxonomy } from '@atlas/contracts';
+	import type { AnnotationInput, ItemDetail, ItemPage, ItemStatus, ItemView, Project, QueueNext, Taxonomy } from '@atlas/contracts';
+	import { formatSpan } from '../shared/time';
 	import { onMount, untrack } from 'svelte';
 	import { kernelContext } from '../../kernel/context';
 	import EmptyState from '../../lib/components/EmptyState.svelte';
@@ -13,7 +14,7 @@
 	import { settings } from '../settings/settings.svelte';
 	import SparkleIcon from 'phosphor-svelte/lib/Sparkle';
 	import type { QueueFilter } from './itemFilter';
-	import { apiItemPath, labelPath, queuePath } from './itemLink';
+	import { apiItemPath, labelHref, queuePath } from './itemLink';
 	import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlass';
 	import XIcon from 'phosphor-svelte/lib/X';
 	import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwise';
@@ -53,6 +54,8 @@
 	let similarTimer: ReturnType<typeof setTimeout> | undefined;
 	/** The adapter can rank items by a description (the project has semanticSearch). */
 	let canSearchScenes = $state(false);
+	/** Title of the item a `like` filter finds items similar to. */
+	let likeName = $state('');
 	let searchTimer: ReturnType<typeof setTimeout> | undefined;
 	let taxonomy = $state<Taxonomy | undefined>(undefined);
 	let page = $state<ItemPage>({ items: [] });
@@ -121,6 +124,36 @@
 		return similar;
 	}
 
+	$effect(() => {
+		const itemId = narrowing.like;
+		untrack(() => void loadLikeName(itemId));
+	});
+
+	async function loadLikeName(itemId: string | undefined) {
+		if (itemId === undefined || itemId === '') {
+			likeName = '';
+			return;
+		}
+		likeName = itemId;
+		try {
+			const detail = await ctx.api.get<ItemDetail>(apiItemPath(projectId, itemId));
+			likeName = nameOf(detail);
+		} catch {
+			// The id stays as the name.
+		}
+	}
+
+	function nameOf(view: ItemView): string {
+		let title = view.asset.id;
+		if (view.asset.title !== undefined) {
+			title = view.asset.title;
+		}
+		if (view.item.span === undefined) {
+			return title;
+		}
+		return `${title} · ${formatSpan(view.item.span)}`;
+	}
+
 	function onSimilarInput() {
 		clearTimeout(similarTimer);
 		similarTimer = setTimeout(() => narrow({ similar: similarText.trim() }), SIMILAR_DELAY_MS);
@@ -173,7 +206,7 @@
 		try {
 			const project = await ctx.api.get<Project>(`/projects/${encodeURIComponent(projectId)}`);
 			taxonomy = project.taxonomy;
-			canSearchScenes = project.semanticSearch !== undefined;
+			canSearchScenes = project.semanticSearch !== undefined && project.semanticSearch.byText === true;
 		} catch (failure) {
 			error = messageOf(failure);
 		}
@@ -320,7 +353,7 @@
 				ctx.toasts.push(emptyQueueMessage(), 'info');
 				return;
 			}
-			ctx.router.navigate(labelPath(projectId, next.item.item.id) + filterSearch(narrowing));
+			ctx.router.navigate(labelHref(projectId, next.item.item.id, filterSearch(narrowing), next.item.matchAt));
 		} catch (failure) {
 			ctx.toasts.push(messageOf(failure), 'error');
 		} finally {
@@ -429,7 +462,14 @@
 	</div>
 
 	<div class="mb-4 flex flex-wrap items-center gap-2">
-		{#if canSearchScenes}
+		{#if narrowing.like}
+			<span class="border-violet/50 bg-violet/10 text-default flex max-w-96 items-center gap-1.5 rounded-lg border py-1 pr-1 pl-2.5 text-xs" title="Items the project's search finds like this one">
+				<SparkleIcon size={13} class="text-violet shrink-0" />
+				<span class="truncate">Like {likeName}</span>
+				<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={() => narrow({ like: '' })} aria-label="Stop finding similar items"><XIcon size={12} /></button>
+			</span>
+		{/if}
+		{#if canSearchScenes && !narrowing.like}
 			<label class="relative w-72" title="Items the project's search adapter finds for the description, best match first">
 				<span class="text-violet pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"><SparkleIcon size={14} /></span>
 				<input

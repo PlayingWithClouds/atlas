@@ -7,6 +7,8 @@ export interface SpanLoopOptions {
   video: () => HTMLVideoElement | undefined;
   url: () => string;
   span: () => LoopWindow | undefined;
+  /** Where to open instead of the window start, when inside the window. */
+  start?: () => number | undefined;
   /** Called with the playhead on every frame while playing and after seeks. */
   ontime?: (seconds: number) => void;
   onfail: (message: string) => void;
@@ -32,7 +34,7 @@ export class SpanLoop {
       return undefined;
     }
     const url = this.options.url();
-    const start = untrack(() => this.windowStart());
+    const start = untrack(() => this.openingStart());
     let detach: (() => void) | undefined;
     let cancelled = false;
     attachSource(video, url, start)
@@ -53,6 +55,20 @@ export class SpanLoop {
     };
   }
 
+  /** The requested start when it lies inside the window, else the window start. */
+  private openingStart(): number {
+    const windowStart = this.windowStart();
+    const requested = this.options.start?.();
+    const window = this.options.span();
+    if (requested === undefined || window === undefined) {
+      return windowStart;
+    }
+    if (requested < windowStart || requested > window.end) {
+      return windowStart;
+    }
+    return requested;
+  }
+
   private windowStart(): number {
     const window = this.options.span();
     if (window === undefined) {
@@ -66,7 +82,7 @@ export class SpanLoop {
     if (video === undefined) {
       return;
     }
-    video.currentTime = this.windowStart();
+    video.currentTime = this.openingStart();
     this.report();
   }
 
@@ -79,7 +95,7 @@ export class SpanLoop {
     if (video === undefined || this.roaming || !video.paused) {
       return;
     }
-    const start = this.windowStart();
+    const start = this.openingStart();
     if (Math.abs(video.currentTime - start) > START_TOLERANCE_SECONDS) {
       video.currentTime = start;
     }

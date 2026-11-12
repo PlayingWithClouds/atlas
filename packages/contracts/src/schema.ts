@@ -147,12 +147,28 @@ export interface Project {
    * `GET <url>?item=<item id>&at=<item seconds>` → `{ ranges: (Range & { score })[] }`.
    */
   liveSuggestions?: string;
-  /**
-   * URL atlas asks to rank items by a text query (the queue's semantic search):
-   * `GET <url>?q=<text>&limit=<n>` → `{ items: { itemId: string; score: number }[] }`, best first,
-   * score from 0 to 1 (shown as a percentage). How the adapter ranks is its own business.
-   */
-  semanticSearch?: string;
+  /** An adapter that finds items: by a description, by example, or both (see SemanticSearch). */
+  semanticSearch?: SemanticSearch;
+}
+
+/**
+ * Where atlas asks an adapter to find items, and what it can find them by:
+ * `GET <url>?q=<text>&limit=<n>` (byText) or `GET <url>?item=<item id>&limit=<n>` (byExample) →
+ * `{ items: SimilarItem[] }`, best first. How the adapter ranks is its own business.
+ */
+export interface SemanticSearch {
+  url: string;
+  byText?: boolean;
+  byExample?: boolean;
+}
+
+/** One item of a search answer. */
+export interface SimilarItem {
+  itemId: string;
+  /** 0 to 1, shown as a percentage. */
+  score: number;
+  /** Asset seconds where the item matches best, for items on a timeline; the player starts there. */
+  at?: number;
 }
 
 export interface ProjectInput {
@@ -208,6 +224,8 @@ export interface ItemView {
   annotation?: Annotation;
   /** In a list filtered by `label` or `unsure`: the model's probability for that label. */
   match?: number;
+  /** In a list filtered by `similar` or `like`: asset seconds where the item matches best. */
+  matchAt?: number;
 }
 
 /** Query of `GET /items` and `GET /queue/next` that narrows and orders the items. */
@@ -223,6 +241,8 @@ export interface ItemFilterQuery {
   margin?: number;
   /** Free text: items the project's semantic search ranks best for it, most similar first. */
   similar?: string;
+  /** An item id: items the project's search finds like it, most similar first. */
+  like?: string;
   /** order: push order (default); queue: as the queue serves them; match: by `match`. */
   sort?: "order" | "queue" | "match";
 }

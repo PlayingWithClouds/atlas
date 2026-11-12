@@ -64,6 +64,7 @@ export type LabelAction =
   | { kind: "wholeItem" }
   | { kind: "acceptHere" }
   | { kind: "undo" }
+  | { kind: "findSimilar" }
   | { kind: "redo" }
   | { kind: "leader" }
   | { kind: "escape" };
@@ -113,6 +114,7 @@ export const COMMANDS: Command[] = [
   { id: "clearGroup", action: { kind: "clearGroup" }, title: "Delete the selected range, else clear the focused group", defaults: ["Backspace", "Delete"] },
   { id: "undo", action: { kind: "undo" }, title: "Undo the last change to the labels", defaults: ["Ctrl+z", "Meta+z"], repeat: true, short: "undo" },
   { id: "redo", action: { kind: "redo" }, title: "Redo what was undone", defaults: ["Ctrl+Shift+z", "Meta+Shift+z", "Ctrl+y"], repeat: true },
+  { id: "findSimilar", action: { kind: "findSimilar" }, title: "Find items like this one (when the project's search can)", defaults: ["<leader> s"] },
   { id: "escape", action: { kind: "escape" }, title: "Drop started labels, deselect the range, stop looping it", defaults: ["Escape"] },
   { id: "reviewed", action: { kind: "toggleReviewed" }, title: "Mark the focused group (not) reviewed", defaults: ["u"] },
   { id: "mute", action: { kind: "toggleMuted" }, title: "Mute / unmute", defaults: ["m"] },

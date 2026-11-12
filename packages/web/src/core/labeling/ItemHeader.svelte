@@ -7,6 +7,7 @@
 	import CaretRightIcon from 'phosphor-svelte/lib/CaretRight';
 	import ArrowUUpLeftIcon from 'phosphor-svelte/lib/ArrowUUpLeft';
 	import ArrowUUpRightIcon from 'phosphor-svelte/lib/ArrowUUpRight';
+	import SparkleIcon from 'phosphor-svelte/lib/Sparkle';
 
 	let {
 		detail,
@@ -16,6 +17,8 @@
 		canRedo,
 		onundo,
 		onredo,
+		canFindSimilar,
+		onfindsimilar,
 		onleave,
 		onneighbour
 	}: {
@@ -27,6 +30,9 @@
 		canRedo: boolean;
 		onundo: () => void;
 		onredo: () => void;
+		/** The project's search can find items like this one. */
+		canFindSimilar: boolean;
+		onfindsimilar: () => void;
 		onleave: () => void;
 		onneighbour: (offset: 1 | -1) => void;
 	} = $props();
@@ -54,6 +60,11 @@
 	<StatusChip status={detail.status} />
 	{#if dirty}<span class="badge bg-amber-soft text-amber">unsaved</span>{/if}
 	<div class="ml-auto flex items-center gap-2">
+		{#if canFindSimilar}
+			<button type="button" tabindex="-1" class="btn btn-ghost btn-sm" onmousedown={(event) => event.preventDefault()} onclick={onfindsimilar} title="Items like this one, in the queue (leader s)">
+				<SparkleIcon size={14} /> Find similar
+			</button>
+		{/if}
 		<div class="flex items-center">
 			<button type="button" tabindex="-1" class="btn btn-ghost btn-sm btn-square" disabled={!canUndo} onmousedown={(event) => event.preventDefault()} onclick={onundo} aria-label="Undo" title="Undo (Ctrl+Z)">
 				<ArrowUUpLeftIcon size={15} />

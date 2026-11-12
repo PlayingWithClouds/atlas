@@ -6,7 +6,7 @@
 	import { messageOf } from '../shared/errors';
 	import { apiFilterSearch } from './apiFilter';
 	import { currentFilter, filterSearch } from './itemFilter';
-	import { labelPath, queuePath } from './itemLink';
+	import { labelHref, queuePath } from './itemLink';
 
 	let { params }: { params: Record<string, string> } = $props();
 
@@ -22,7 +22,7 @@
 				ctx.router.navigate(queuePath(projectId), { replace: true });
 				return;
 			}
-			ctx.router.navigate(labelPath(projectId, next.item.item.id) + search, { replace: true });
+			ctx.router.navigate(labelHref(projectId, next.item.item.id, search, next.item.matchAt), { replace: true });
 		} catch (failure) {
 			ctx.toasts.push(messageOf(failure), 'error');
 			ctx.router.navigate(queuePath(projectId), { replace: true });

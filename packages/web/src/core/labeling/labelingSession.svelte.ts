@@ -5,7 +5,7 @@ import type { Context } from '@neoworks/extension-system';
 import { apiFilterSearch } from '../queue/apiFilter';
 import { currentFilter, filterSearch, hasFilter } from '../queue/itemFilter';
 import type { QueueFilter } from '../queue/itemFilter';
-import { apiItemPath, labelPath, queuePath } from '../queue/itemLink';
+import { apiItemPath, labelHref, labelPath, queuePath, startFromLocation } from '../queue/itemLink';
 import { messageOf, problemsOf } from '../shared/errors';
 import {
   buildAnnotationInput,
@@ -87,6 +87,8 @@ export class LabelingSession {
   /** A range the player loops instead of the item (double-click on it). */
   loopedRange = $state.raw<Range | undefined>(undefined);
   playhead = $state(0);
+  /** Asset seconds the player opens at instead of the span start (`at` in the URL: a search match). */
+  startAt = $state<number | undefined>(undefined);
   loading = $state(true);
   saving = $state(false);
   loadError = $state('');
@@ -289,6 +291,7 @@ export class LabelingSession {
     this.loopedRange = undefined;
     this.serverProblems = [];
     this.lastTouchedLabel = {};
+    this.startAt = startFromLocation();
     this.history = this.storedHistory(project, detail);
     this.personEdited = false;
     this.restoreStoredDraft(project, detail);
@@ -351,14 +354,44 @@ export class LabelingSession {
   /** A new video loads itself paused at its span start; the same video just jumps to the new scene, paused. */
   private restartPlayback(sameAsset: boolean): void {
     // The timeline shows the scene start at once, not 0 until the player reports in.
-    if (this.playSpan !== undefined) {
-      this.playhead = this.playSpan.start;
+    const start = this.openingTime();
+    if (start === undefined) {
+      return;
     }
-    if (!sameAsset || this.handle === undefined || this.playSpan === undefined) {
+    this.playhead = start;
+    if (!sameAsset || this.handle === undefined) {
       return;
     }
     this.handle.pause();
-    this.handle.seek(this.playSpan.start);
+    this.handle.seek(start);
+  }
+
+  /** `startAt` when it lies inside the span played, else the span start. */
+  private openingTime(): number | undefined {
+    const span = this.playSpan;
+    if (span === undefined) {
+      return undefined;
+    }
+    const start = this.startAt;
+    if (start === undefined || start < span.start || start > span.end) {
+      return span.start;
+    }
+    return start;
+  }
+
+  /** The project's search can find items like this one. */
+  readonly canFindSimilar = $derived(this.project?.semanticSearch?.byExample === true);
+
+  /** Opens the queue with the items the project's search finds like this one. */
+  findSimilar(): void {
+    if (this.item === undefined) {
+      return;
+    }
+    if (!this.canFindSimilar) {
+      this.say("This project's search cannot find items by example");
+      return;
+    }
+    this.ctx.router.navigate(queuePath(this.projectId()) + filterSearch({ like: this.item.id, sort: 'match' }));
   }
 
   pause(): void {
@@ -944,7 +977,7 @@ export class LabelingSession {
       this.ctx.router.navigate(queuePath(this.projectId()) + filterSearch(filter));
       return;
     }
-    this.ctx.router.navigate(labelPath(this.projectId(), next.item.item.id) + filterSearch(filter));
+    this.ctx.router.navigate(labelHref(this.projectId(), next.item.item.id, filterSearch(filter), next.item.matchAt));
   }
 
   /** Previous (-1) or next (+1) scene of the same video. */
@@ -1006,6 +1039,7 @@ export class LabelingSession {
       leader: () => this.startLeader(),
       acceptHere: () => void this.acceptSuggestionsHere(),
       undo: () => this.undo(),
+      findSimilar: () => this.findSimilar(),
       redo: () => this.redo(),
     };
     simple[action.kind]?.();
