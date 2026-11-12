@@ -10,6 +10,7 @@ import { ItemViews } from "./itemViews";
 import { MediaService } from "./mediaService";
 import { MediaTable } from "./mediaTable";
 import { STORE_MIGRATIONS, STORE_NAMESPACE } from "./migrations";
+import { ModelOverviewQuery } from "./modelOverview";
 import { ProjectsService } from "./projectsService";
 import { ProjectsTable } from "./projectsTable";
 import { SuggestionsTable } from "./suggestionsTable";
@@ -44,7 +45,12 @@ export class StoreCore extends Service implements StoreService {
       this.projects,
       this.events,
     );
-    this.items = new ItemsService(new ItemViews(database), suggestionsTable, this.projects);
+    this.items = new ItemsService(
+      new ItemViews(database),
+      new ModelOverviewQuery(database),
+      suggestionsTable,
+      this.projects,
+    );
     this.annotations = new AnnotationsService(ctx.db, annotationsTable, mediaTable, this.projects, this.events);
   }
 

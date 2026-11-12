@@ -200,6 +200,48 @@ export interface ItemView {
   /** Highest priority over all suggestion sources. */
   priority?: number;
   annotation?: Annotation;
+  /** In a list filtered by `label` or `unsure`: the model's probability for that label. */
+  match?: number;
+}
+
+/** Query of `GET /items` and `GET /queue/next` that narrows and orders the items. */
+export interface ItemFilterQuery {
+  status?: ItemStatus;
+  /** Part of the asset title or item id. */
+  q?: string;
+  /** `group.label`: labeled with it, or (not labeled yet) the model suggests it. */
+  label?: string;
+  /** `group` or `group.label`: the model is unsure about it. */
+  unsure?: string;
+  /** order: push order (default); queue: as the queue serves them; match: by `match`. */
+  sort?: "order" | "queue" | "match";
+}
+
+/** `GET /api/projects/:project/model`: where the model is sure and unsure, over pending items. */
+export interface ModelOverview {
+  /** Suggestion source the overview and the label filters read; absent without suggestions. */
+  source?: string;
+  pending: number;
+  /** Pending items the model has suggested values for. */
+  suggested: number;
+  groups: ModelGroupOverview[];
+}
+
+export interface ModelGroupOverview {
+  group: string;
+  /** Pending items with at least one label of the group in the unsure band. */
+  unsure: number;
+  labels: ModelLabelOverview[];
+}
+
+export interface ModelLabelOverview {
+  label: string;
+  /** Labeled items with this label (whole item or a range). */
+  labeled: number;
+  /** Pending items the model gives it at least a likely probability. */
+  likely: number;
+  /** Pending items whose probability for it is inside the unsure band. */
+  unsure: number;
 }
 
 export interface ItemPage {

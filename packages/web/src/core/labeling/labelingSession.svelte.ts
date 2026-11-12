@@ -2,6 +2,8 @@ import { isGroupActive, itemLength, validateAnnotation } from '@atlas/contracts'
 import type { AnnotationStatus, Group, ItemDetail, ItemView, Project, Range, Suggestion } from '@atlas/contracts';
 import type { PlayerHandle } from '@atlas/contracts/web';
 import type { Context } from '@neoworks/extension-system';
+import { currentFilter, filterSearch, hasFilter } from '../queue/itemFilter';
+import type { QueueFilter } from '../queue/itemFilter';
 import { apiItemPath, labelPath, queuePath } from '../queue/itemLink';
 import { messageOf, problemsOf } from '../shared/errors';
 import {
@@ -790,16 +792,16 @@ export class LabelingSession {
   }
 
   private async openNext(afterItemId: string): Promise<void> {
-    const query = new URLSearchParams({ after: afterItemId });
+    const filter = currentFilter();
     const next = await this.ctx.api.get<{ item?: ItemView; pending: number }>(
-      `/projects/${encodeURIComponent(this.projectId())}/queue/next?${query}`,
+      `/projects/${encodeURIComponent(this.projectId())}/queue/next${filterSearch(filter, { after: afterItemId })}`,
     );
     if (next.item === undefined) {
-      this.ctx.toasts.push('Queue finished: nothing pending is left', 'success');
-      this.ctx.router.navigate(queuePath(this.projectId()));
+      this.ctx.toasts.push(finishedMessage(filter), 'success');
+      this.ctx.router.navigate(queuePath(this.projectId()) + filterSearch(filter));
       return;
     }
-    this.ctx.router.navigate(labelPath(this.projectId(), next.item.item.id));
+    this.ctx.router.navigate(labelPath(this.projectId(), next.item.item.id) + filterSearch(filter));
   }
 
   /** Previous (-1) or next (+1) scene of the same video. */
@@ -812,11 +814,11 @@ export class LabelingSession {
       this.say('There is no scene in that direction');
       return;
     }
-    this.ctx.router.navigate(labelPath(this.projectId(), neighbour.item.id));
+    this.ctx.router.navigate(labelPath(this.projectId(), neighbour.item.id) + filterSearch(currentFilter()));
   }
 
   leave(): void {
-    this.ctx.router.navigate(queuePath(this.projectId()));
+    this.ctx.router.navigate(queuePath(this.projectId()) + filterSearch(currentFilter()));
   }
 
   // --- keys ----------------------------------------------------------------------------
@@ -1039,3 +1041,9 @@ export class LabelingSession {
   }
 }
 
+function finishedMessage(filter: QueueFilter): string {
+  if (hasFilter(filter)) {
+    return 'Filter finished: nothing pending matches it anymore';
+  }
+  return 'Queue finished: nothing pending is left';
+}

@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import { kernelContext } from '../../kernel/context';
 	import { messageOf } from '../shared/errors';
+	import { currentFilter, filterSearch } from './itemFilter';
 	import { labelPath, queuePath } from './itemLink';
 
 	let { params }: { params: Record<string, string> } = $props();
@@ -12,14 +13,15 @@
 
 	async function openNext() {
 		const projectId = params.project;
+		const search = filterSearch(currentFilter());
 		try {
-			const next = await ctx.api.get<QueueNext>(`/projects/${encodeURIComponent(projectId)}/queue/next`);
+			const next = await ctx.api.get<QueueNext>(`/projects/${encodeURIComponent(projectId)}/queue/next${search}`);
 			if (next.item === undefined) {
 				ctx.toasts.push('Nothing pending: the queue is empty', 'info');
 				ctx.router.navigate(queuePath(projectId), { replace: true });
 				return;
 			}
-			ctx.router.navigate(labelPath(projectId, next.item.item.id), { replace: true });
+			ctx.router.navigate(labelPath(projectId, next.item.item.id) + search, { replace: true });
 		} catch (failure) {
 			ctx.toasts.push(messageOf(failure), 'error');
 			ctx.router.navigate(queuePath(projectId), { replace: true });

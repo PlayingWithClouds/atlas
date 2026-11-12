@@ -1,27 +1,20 @@
-import type { ItemDetail, ItemPage, ItemStatus, QueueNext } from "@atlas/contracts";
+import type { ItemDetail, ItemFilterQuery, ItemPage, ModelOverview, QueueNext } from "@atlas/contracts";
 import { HttpError } from "@atlas/contracts/server";
+import { needsModel, readFilter } from "./itemFilter";
+import type { ItemFilter } from "./itemFilter";
 import type { ItemViews } from "./itemViews";
+import type { ModelOverviewQuery } from "./modelOverview";
 import { readCursor, readLimit } from "./query";
 import type { ProjectsService } from "./projectsService";
 import type { SuggestionsTable } from "./suggestionsTable";
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAXIMUM_PAGE_SIZE = 1000;
-const STATUSES: ItemStatus[] = ["pending", "labeled", "skipped"];
 
-function readStatus(status: string | undefined): ItemStatus | undefined {
-  if (status === undefined || status === "") {
-    return undefined;
-  }
-  const match = STATUSES.find((candidate) => candidate === status);
-  if (match === undefined) {
-    throw new HttpError(400, "status must be pending, labeled or skipped");
-  }
-  return match;
-}
+/** Filter parameters as they arrive in a URL: all optional strings, checked by readFilter. */
+export type ItemFilterQueryText = { [Key in keyof ItemFilterQuery]?: string };
 
-export interface ItemListQuery {
-  status?: string;
+export interface ItemListQuery extends ItemFilterQueryText {
   cursor?: string;
   limit?: string;
 }
@@ -30,15 +23,15 @@ export interface ItemListQuery {
 export class ItemsService {
   constructor(
     private readonly views: ItemViews,
+    private readonly overviews: ModelOverviewQuery,
     private readonly suggestions: SuggestionsTable,
     private readonly projects: ProjectsService,
   ) {}
 
   list(projectId: string, query: ItemListQuery): ItemPage {
-    this.projects.require(projectId);
     return this.views.page(projectId, {
-      status: readStatus(query.status),
-      after: readCursor(query.cursor, "cursor"),
+      filter: this.filterOf(projectId, query),
+      cursor: readCursor(query.cursor, "cursor"),
       limit: readLimit(query.limit, DEFAULT_PAGE_SIZE, MAXIMUM_PAGE_SIZE),
     });
   }
@@ -56,8 +49,30 @@ export class ItemsService {
     };
   }
 
-  queueNext(projectId: string, after: string | undefined): QueueNext {
-    this.projects.require(projectId);
-    return this.views.queueNext(projectId, after);
+  queueNext(projectId: string, after: string | undefined, query: ItemFilterQueryText = {}): QueueNext {
+    return this.views.queueNext(projectId, after, this.filterOf(projectId, query));
+  }
+
+  modelOverview(projectId: string): ModelOverview {
+    const project = this.projects.require(projectId);
+    return this.overviews.overview(projectId, this.modelSource(projectId), project.taxonomy);
+  }
+
+  private filterOf(projectId: string, query: ItemFilterQueryText): ItemFilter {
+    const project = this.projects.require(projectId);
+    const filter = readFilter(query as ItemFilterQuery, project.taxonomy);
+    if (needsModel(filter)) {
+      filter.modelSource = this.modelSource(projectId);
+    }
+    return filter;
+  }
+
+  /** The project's prefill source when set, otherwise whichever source last pushed values. */
+  private modelSource(projectId: string): string | undefined {
+    const project = this.projects.require(projectId);
+    if (project.prefillSource !== undefined) {
+      return project.prefillSource;
+    }
+    return this.suggestions.latestValueSource(projectId);
   }
 }

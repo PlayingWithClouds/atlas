@@ -34,6 +34,20 @@ export class SuggestionsTable {
     return rows.map((row) => JSON.parse(row.data));
   }
 
+  /** Source of the most recent push that carried values, i.e. the model's current output. */
+  latestValueSource(projectId: string): string | undefined {
+    const row = this.database
+      .query(
+        `SELECT source FROM suggestions WHERE project_id = ? AND json_type(data, '$.values') IS NOT NULL
+         ORDER BY pushed DESC LIMIT 1`,
+      )
+      .get(projectId) as { source: string } | null;
+    if (row === null) {
+      return undefined;
+    }
+    return row.source;
+  }
+
   deleteForItem(projectId: string, itemId: string): void {
     this.database.query("DELETE FROM suggestions WHERE project_id = ? AND item_id = ?").run(projectId, itemId);
   }

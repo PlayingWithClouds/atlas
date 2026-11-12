@@ -11,6 +11,7 @@
 	let {
 		projectId,
 		view,
+		search = '',
 		selected,
 		selecting,
 		onselect,
@@ -19,6 +20,8 @@
 	}: {
 		projectId: string;
 		view: ItemView;
+		/** Query string the labeling screen keeps (the queue's filters). */
+		search?: string;
 		selected: boolean;
 		/** Some card is selected: a click on a card selects it instead of opening it. */
 		selecting: boolean;
@@ -70,7 +73,7 @@
 </script>
 
 <a
-	href={labelPath(projectId, view.item.id)}
+	href={labelPath(projectId, view.item.id) + search}
 	onclick={onCardClick}
 	class="bg-surface group relative flex flex-col overflow-hidden rounded-lg border transition-colors {selected ? 'border-action' : 'border-line hover:border-line-strong'}"
 >
@@ -108,6 +111,9 @@
 			<StatusChip status={view.status} />
 			{#if view.item.span}
 				<span class="text-dim font-mono text-2xs">{formatSpan(view.item.span)}</span>
+			{/if}
+			{#if view.match !== undefined}
+				<span class="badge badge-sm badge-outline font-mono" title="Model probability for the filtered label">{Math.round(view.match * 100)}%</span>
 			{/if}
 			{#if view.priority !== undefined}
 				<span class="text-faint ml-auto font-mono text-2xs" title="Priority">p {view.priority.toFixed(2)}</span>
