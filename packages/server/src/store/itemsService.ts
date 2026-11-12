@@ -1,7 +1,7 @@
-import type { ItemDetail, ItemFilterQuery, ItemPage, ModelOverview, QueueNext } from "@atlas/contracts";
+import type { ItemDetail, ItemFilterQuery, ItemPage, ModelOverview, QueueNext, SemanticSearch, SimilarItem } from "@atlas/contracts";
 import { HttpError } from "@atlas/contracts/server";
 import { needsModel, readFilter, readMargin } from "./itemFilter";
-import type { ItemFilter, SimilarItem } from "./itemFilter";
+import type { ItemFilter } from "./itemFilter";
 import type { ItemViews } from "./itemViews";
 import type { ModelOverviewQuery } from "./modelOverview";
 import { readCursor, readLimit } from "./query";
@@ -10,7 +10,7 @@ import type { SuggestionsTable } from "./suggestionsTable";
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAXIMUM_PAGE_SIZE = 1000;
-/** Items a semantic search ranks; the rest drop out of a `similar` list. */
+/** Items a search returns at most; the rest drop out of a `similar` or `like` list. */
 const SIMILAR_LIMIT = 2000;
 const SIMILAR_TIMEOUT_MS = 15000;
 /** Paging through one search asks the adapter once. */
@@ -77,23 +77,21 @@ export class ItemsService {
     if (needsModel(filter)) {
       filter.modelSource = this.modelSource(projectId);
     }
-    if (filter.similar !== undefined) {
-      filter.similarItems = await this.similarItems(project.semanticSearch, filter.similar);
+    const request = searchRequestOf(filter, project.semanticSearch);
+    if (request !== undefined) {
+      filter.similarItems = await this.similarItems(request);
     }
     return filter;
   }
 
-  /** The adapter's ranking for a text query, kept a few minutes so paging asks once. */
-  private async similarItems(url: string | undefined, text: string): Promise<SimilarItem[]> {
-    if (url === undefined) {
-      throw new HttpError(400, "this project has no semantic search (an adapter sets semanticSearch)");
-    }
-    const key = `${url}\u0000${text}`;
+  /** The adapter's answer for a description or an example item, kept a few minutes so paging asks once. */
+  private async similarItems(request: SearchRequest): Promise<SimilarItem[]> {
+    const key = `${request.url}\u0000${request.parameter}\u0000${request.value}`;
     const cached = this.searches.get(key);
     if (cached !== undefined && Date.now() - cached.at < SIMILAR_CACHE_MS) {
       return cached.items;
     }
-    const items = await fetchSimilar(url, text);
+    const items = await fetchSimilar(request);
     this.searches.set(key, { items, at: Date.now() });
     if (this.searches.size > SIMILAR_CACHE_SIZE) {
       const oldest = this.searches.keys().next().value;
@@ -114,9 +112,39 @@ export class ItemsService {
   }
 }
 
-async function fetchSimilar(url: string, text: string): Promise<SimilarItem[]> {
-  const target = new URL(url);
-  target.searchParams.set("q", text);
+interface SearchRequest {
+  url: string;
+  /** q: by description; item: by example. */
+  parameter: "q" | "item";
+  value: string;
+}
+
+/** What to ask the project's search for a `similar` or `like` filter, checked against what it can do. */
+function searchRequestOf(filter: ItemFilter, search: SemanticSearch | undefined): SearchRequest | undefined {
+  if (filter.similar === undefined && filter.like === undefined) {
+    return undefined;
+  }
+  if (filter.similar !== undefined && filter.like !== undefined) {
+    throw new HttpError(400, "similar and like cannot be combined");
+  }
+  if (search === undefined) {
+    throw new HttpError(400, "this project has no search (an adapter sets semanticSearch)");
+  }
+  if (filter.like !== undefined) {
+    if (search.byExample !== true) {
+      throw new HttpError(400, "this project's search cannot find items by example");
+    }
+    return { url: search.url, parameter: "item", value: filter.like };
+  }
+  if (search.byText !== true) {
+    throw new HttpError(400, "this project's search cannot find items by description");
+  }
+  return { url: search.url, parameter: "q", value: filter.similar as string };
+}
+
+async function fetchSimilar(request: SearchRequest): Promise<SimilarItem[]> {
+  const target = new URL(request.url);
+  target.searchParams.set(request.parameter, request.value);
   target.searchParams.set("limit", String(SIMILAR_LIMIT));
   let response: Response;
   try {
@@ -136,7 +164,16 @@ function similarItemsOf(body: unknown): SimilarItem[] {
     throw new HttpError(502, "semantic search answered without an items list");
   }
   const entries = (body as { items: unknown[] }).items;
-  return entries.filter(isSimilarItem);
+  return entries.filter(isSimilarItem).map(cleanSimilarItem);
+}
+
+/** Only the fields atlas reads; an `at` that is no finite number is dropped. */
+function cleanSimilarItem(entry: SimilarItem): SimilarItem {
+  const item: SimilarItem = { itemId: entry.itemId, score: entry.score };
+  if (typeof entry.at === "number" && Number.isFinite(entry.at)) {
+    item.at = entry.at;
+  }
+  return item;
 }
 
 function isSimilarItem(entry: unknown): entry is SimilarItem {

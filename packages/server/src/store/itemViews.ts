@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { Item, ItemPage, ItemStatus, ItemView, QueueNext } from "@atlas/contracts";
-import { filterConditions, isNarrowed, matchExpression, modelJoin, orderTerms } from "./itemFilter";
+import { filterConditions, isNarrowed, isSearch, matchAtExpression, matchExpression, modelJoin, orderTerms } from "./itemFilter";
 import type { ItemFilter } from "./itemFilter";
 
 interface ViewRow {
@@ -11,6 +11,7 @@ interface ViewRow {
   annotation: string | null;
   priority: number | null;
   match?: number | null;
+  match_at?: number | null;
 }
 
 export interface PageRequest {
@@ -56,6 +57,9 @@ function viewOf(row: ViewRow): ItemView {
   if (row.match !== undefined && row.match !== null) {
     view.match = row.match;
   }
+  if (row.match_at !== undefined && row.match_at !== null) {
+    view.matchAt = row.match_at;
+  }
   return view;
 }
 
@@ -68,7 +72,8 @@ const FILTERED_SELECT = `
     annotations.data AS annotation,
     (SELECT MAX(suggestions.priority) FROM suggestions
        WHERE suggestions.project_id = items.project_id AND suggestions.item_id = items.id) AS priority,
-    MATCH_EXPRESSION AS match
+    MATCH_EXPRESSION AS match,
+    MATCH_AT AS match_at
   FROM items
   JOIN assets ON assets.project_id = items.project_id AND assets.id = items.asset_id
   LEFT JOIN annotations ON annotations.project_id = items.project_id AND annotations.item_id = items.id
@@ -114,7 +119,9 @@ export class ItemViews {
     const match = matchExpression(request.filter);
     const join = modelJoin(request.filter);
     const conditions = filterConditions(request.filter);
-    const select = FILTERED_SELECT.replace("MATCH_EXPRESSION", match.sql).replace("MODEL_JOIN", join.sql);
+    const select = FILTERED_SELECT.replace("MATCH_EXPRESSION", match.sql)
+      .replace("MATCH_AT", matchAtExpression(request.filter))
+      .replace("MODEL_JOIN", join.sql);
     const params = [...match.params, ...join.params, projectId];
     if (request.filter.sort === "order") {
       return this.database
@@ -156,19 +163,23 @@ export class ItemViews {
   /** Pending items by highest suggestion priority, items without priority last, then push order. */
   queueNext(projectId: string, after: string | undefined, filter: ItemFilter): QueueNext {
     const pending = this.countPending(projectId);
-    const nextId = this.nextPendingId(projectId, excludedItemId(after), filter);
-    if (nextId === undefined) {
+    const next = this.nextPending(projectId, excludedItemId(after), filter);
+    if (next === undefined) {
       return { pending };
     }
-    const row = this.rowOf(projectId, nextId);
+    const row = this.rowOf(projectId, next.id);
     if (row === undefined) {
       return { pending };
     }
-    return { item: viewOf(row), pending };
+    const item = viewOf(row);
+    if (next.at !== null) {
+      item.matchAt = next.at;
+    }
+    return { item, pending };
   }
 
   /** Sorts ids only: carrying the JSON columns through the sort made this ~15x slower. */
-  private nextPendingId(projectId: string, excludedId: string, filter: ItemFilter): string | undefined {
+  private nextPending(projectId: string, excludedId: string, filter: ItemFilter): { id: string; at: number | null } | undefined {
     const join = modelJoin(filter);
     const conditions = filterConditions({ ...filter, status: "pending" });
     const row = this.database
@@ -176,7 +187,7 @@ export class ItemViews {
         `WITH best AS (
            SELECT item_id, MAX(priority) AS priority FROM suggestions WHERE project_id = ? GROUP BY item_id
          )
-         SELECT items.id AS id FROM items
+         SELECT items.id AS id, ${matchAtExpression(filter)} AS at FROM items
          JOIN assets ON assets.project_id = items.project_id AND assets.id = items.asset_id
          LEFT JOIN annotations ON annotations.project_id = items.project_id AND annotations.item_id = items.id
          LEFT JOIN best ON best.item_id = items.id
@@ -184,11 +195,11 @@ export class ItemViews {
          WHERE items.project_id = ? AND items.id != ? ${conditions.sql}
          ORDER BY ${queueOrder(filter)} LIMIT 1`,
       )
-      .get(projectId, ...join.params, projectId, excludedId, ...conditions.params) as { id: string } | null;
+      .get(projectId, ...join.params, projectId, excludedId, ...conditions.params) as { id: string; at: number | null } | null;
     if (row === null) {
       return undefined;
     }
-    return row.id;
+    return row;
   }
 
   private countPending(projectId: string): number {
@@ -251,7 +262,7 @@ function nextCursor(request: PageRequest, pageRows: ViewRow[]): string {
 
 /** The queue serves by priority; a semantic search serves the most similar first. */
 function queueOrder(filter: ItemFilter): string {
-  if (filter.similar !== undefined) {
+  if (isSearch(filter)) {
     return "semantic.score DESC, items.sequence";
   }
   return "best.priority IS NULL, best.priority DESC, items.sequence";

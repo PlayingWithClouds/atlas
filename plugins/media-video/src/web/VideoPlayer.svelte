@@ -12,7 +12,7 @@
 	import { formatTime, nextPlaybackRate } from './loopWindow';
 	import { SpanLoop } from './spanLoop';
 
-	let { asset, span, poster, onready, ontime }: MediaPlayerProps = $props();
+	let { asset, span, poster, start, onready, ontime }: MediaPlayerProps = $props();
 
 	function posterUrl(): string | undefined {
 		if (poster !== undefined) {
@@ -47,6 +47,7 @@
 		video: () => element,
 		url: () => asset.url,
 		span: () => span,
+		start: () => start,
 		ontime: (seconds) => {
 			playhead = seconds;
 			ontime?.(seconds);

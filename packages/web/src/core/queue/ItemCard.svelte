@@ -3,7 +3,7 @@
 	import { kernelContext } from '../../kernel/context';
 	import StatusChip from '../../lib/components/StatusChip.svelte';
 	import { formatSpan } from '../shared/time';
-	import { labelPath } from './itemLink';
+	import { labelHref } from './itemLink';
 	import { browserDraftStore } from '../labeling/draftStore';
 	import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwise';
 	import CheckIcon from 'phosphor-svelte/lib/Check';
@@ -77,7 +77,7 @@
 </script>
 
 <a
-	href={labelPath(projectId, view.item.id) + search}
+	href={labelHref(projectId, view.item.id, search, view.matchAt)}
 	onclick={onCardClick}
 	class="bg-surface group relative flex flex-col overflow-hidden rounded-lg border transition-colors {selected ? 'border-action' : 'border-line hover:border-line-strong'}"
 >

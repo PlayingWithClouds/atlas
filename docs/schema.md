@@ -218,15 +218,18 @@ them in its URL, and labeling carries them on, so "next" stays inside the filter
 - `unsure=group` or `group.label`: the model's probability is within `margin` of 0.5 (for a
   group: for any of its labels). `margin` defaults to 0.15 and may be 0.05–0.45; the UI sends
   the "Model counts as unsure within" setting.
-- `similar=<text>`: only items the project's `semanticSearch` adapter returns for the text, with
-  its score as `match`; `sort=match` and `queue/next` serve the most similar first. atlas asks
-  `GET <semanticSearch>?q=<text>&limit=2000` → `{ items: { itemId, score }[] }` (best first,
-  only items worth showing, score 0–1). Any ranking works behind it: embeddings, a text index,
-  a classifier and keeps the answer five minutes.
+- `similar=<text>` / `like=<item id>`: only the items the project's search finds for a
+  description / like that item, with its score as `match` and `at` as `matchAt`; `sort=match`
+  and `queue/next` serve the best first. atlas asks `GET <semanticSearch.url>?q=<text>&limit=2000`
+  (needs `byText`) or `?item=<item id>&limit=2000` (needs `byExample`) → `{ items: SimilarItem[] }`
+  (best first, only items worth showing, score 0–1, optional `at` in asset seconds) and keeps
+  the answer five minutes. Any ranking works behind it: embeddings, a text index, a classifier.
+  Opening a result with `at` starts the player there (`?at=` on the labeling URL, the player's
+  `start` prop); items without a timeline ignore it.
 - `sort=order|queue|match`: push order (default, cursor = sequence), queue order, or by the
   model's probability (`label`: highest first; `unsure`: closest to 0.5 first). The last two page
   by offset. Each item carries the probability as `match`. A list narrowed by `q`, `label`,
-`unsure` or `similar` also answers `total` (matches in the status asked for) and `pending`.
+`unsure`, `similar` or `like` also answers `total` (matches in the status asked for) and `pending`.
 
 "The model" is the project's `prefillSource` when set, otherwise the source that most recently
 pushed values. `GET /model` counts, per label, labeled items and pending items the model finds
@@ -239,7 +242,9 @@ interface Project {
   taxonomy: Taxonomy;
   prefillSource?: string;     // suggestion source used to prefill the labeling screen
   liveSuggestions?: string;   // adapter URL asked for ranges at one moment (S), see below
-  semanticSearch?: string;    // adapter URL that ranks items by a text query (queue search)
+  semanticSearch?: { url: string; byText?: boolean; byExample?: boolean };
+                              // adapter that finds items by description and/or example (a bare
+                              // URL is accepted and means byText)
 }
 
 interface Change {

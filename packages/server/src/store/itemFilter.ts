@@ -1,4 +1,4 @@
-import type { ItemFilterQuery, ItemStatus, Taxonomy } from "@atlas/contracts";
+import type { ItemFilterQuery, ItemStatus, SimilarItem, Taxonomy } from "@atlas/contracts";
 import { HttpError } from "@atlas/contracts/server";
 
 /** A label the model gives at least this probability counts as suggested (`label` filter). */
@@ -18,15 +18,10 @@ export interface LabelReference {
   label?: string;
 }
 
-/** One item of a semantic search answer. */
-export interface SimilarItem {
-  itemId: string;
-  score: number;
-}
-
 /**
  * A validated filter. `modelSource` is the suggestion source label filters read; `similarItems`
- * is the semantic search's answer for `similar`, filled in before the query runs.
+ * is the search's answer for `similar` (a description) or `like` (an item), filled in before
+ * the query runs.
  */
 export interface ItemFilter {
   status?: ItemStatus;
@@ -35,6 +30,7 @@ export interface ItemFilter {
   unsure?: LabelReference;
   margin: number;
   similar?: string;
+  like?: string;
   sort: ItemSort;
   modelSource?: string;
   similarItems?: SimilarItem[];
@@ -61,9 +57,14 @@ export function readMargin(margin: string | number | undefined): number {
   return parsed;
 }
 
-/** q, label, unsure or similar is set: the list is narrowed, so counts are worth giving. */
+/** q, label, unsure, similar or like is set: the list is narrowed, so counts are worth giving. */
 export function isNarrowed(filter: ItemFilter): boolean {
-  return filter.search !== undefined || filter.label !== undefined || filter.unsure !== undefined || filter.similar !== undefined;
+  return filter.search !== undefined || filter.label !== undefined || filter.unsure !== undefined || isSearch(filter);
+}
+
+/** The list comes from the project's search (by description or by example). */
+export function isSearch(filter: ItemFilter): boolean {
+  return filter.similar !== undefined || filter.like !== undefined;
 }
 
 export interface SqlPart {
@@ -97,6 +98,9 @@ export function readFilter(query: ItemFilterQuery, taxonomy: Taxonomy): ItemFilt
   }
   if (query.similar !== undefined && query.similar.trim() !== "") {
     filter.similar = query.similar.trim();
+  }
+  if (query.like !== undefined && query.like !== "") {
+    filter.like = query.like;
   }
   return filter;
 }
@@ -148,8 +152,8 @@ export function valuesPath(group: string, label?: string): string {
 }
 
 /**
- * LEFT JOIN of the model's suggestion as `model`, and with `similar` an inner join of the semantic
- * search's answer as `semantic` (items it did not rank drop out).
+ * LEFT JOIN of the model's suggestion as `model`, and with `similar` or `like` an inner join of
+ * the search's answer as `semantic` (items it did not find drop out).
  */
 export function modelJoin(filter: ItemFilter): SqlPart {
   const model = {
@@ -157,13 +161,14 @@ export function modelJoin(filter: ItemFilter): SqlPart {
             ON model.project_id = items.project_id AND model.item_id = items.id AND model.source = ?`,
     params: [modelSourceOf(filter)],
   };
-  if (filter.similar === undefined) {
+  if (!isSearch(filter)) {
     return model;
   }
   return joinParts([
     model,
     {
-      sql: `JOIN (SELECT json_extract(value, '$.itemId') AS item_id, json_extract(value, '$.score') AS score
+      sql: `JOIN (SELECT json_extract(value, '$.itemId') AS item_id, json_extract(value, '$.score') AS score,
+                         json_extract(value, '$.at') AS at
                   FROM json_each(?)) AS semantic ON semantic.item_id = items.id`,
       params: [JSON.stringify(similarItemsOf(filter))],
     },
@@ -196,9 +201,17 @@ export function filterConditions(filter: ItemFilter): SqlPart {
   return joinParts(parts);
 }
 
-/** The semantic score with `similar`, else the model's probability for the filtered label, or NULL. */
+/** Where in the item the search matched best (asset seconds), or NULL. */
+export function matchAtExpression(filter: ItemFilter): string {
+  if (isSearch(filter)) {
+    return "semantic.at";
+  }
+  return "NULL";
+}
+
+/** The search score with `similar` or `like`, else the model's probability for the filtered label, or NULL. */
 export function matchExpression(filter: ItemFilter): SqlPart {
-  if (filter.similar !== undefined) {
+  if (isSearch(filter)) {
     return { sql: "semantic.score", params: [] };
   }
   if (filter.label !== undefined) {
@@ -225,7 +238,7 @@ export function orderTerms(filter: ItemFilter): string {
   if (filter.sort !== "match") {
     return "sequence";
   }
-  if (filter.similar !== undefined || filter.label !== undefined) {
+  if (isSearch(filter) || filter.label !== undefined) {
     return "match IS NULL, match DESC, sequence";
   }
   if (filter.unsure !== undefined) {
