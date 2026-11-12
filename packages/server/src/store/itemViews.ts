@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { Item, ItemPage, ItemStatus, ItemView, QueueNext } from "@atlas/contracts";
-import { filterConditions, isNarrowed, isSearch, matchAtExpression, matchExpression, modelJoin, orderTerms } from "./itemFilter";
+import { filterConditions, isNarrowed, isSearch, itemsFrom, matchAtExpression, matchExpression, modelJoin, orderTerms, searchTable, withClause } from "./itemFilter";
 import type { ItemFilter } from "./itemFilter";
 
 interface ViewRow {
@@ -74,7 +74,7 @@ const FILTERED_SELECT = `
        WHERE suggestions.project_id = items.project_id AND suggestions.item_id = items.id) AS priority,
     MATCH_EXPRESSION AS match,
     MATCH_AT AS match_at
-  FROM items
+  ITEMS_FROM
   JOIN assets ON assets.project_id = items.project_id AND assets.id = items.asset_id
   LEFT JOIN annotations ON annotations.project_id = items.project_id AND annotations.item_id = items.id
   MODEL_JOIN
@@ -100,17 +100,18 @@ export class ItemViews {
 
   /** Items the filter lets through, status included. */
   countMatching(projectId: string, filter: ItemFilter): number {
+    const tables = withClause([searchTable(filter)]);
     const join = modelJoin(filter);
     const conditions = filterConditions(filter);
     const row = this.database
       .query(
-        `SELECT COUNT(*) AS count FROM items
+        `${tables.sql} SELECT COUNT(*) AS count ${itemsFrom(filter)}
          JOIN assets ON assets.project_id = items.project_id AND assets.id = items.asset_id
          LEFT JOIN annotations ON annotations.project_id = items.project_id AND annotations.item_id = items.id
          ${join.sql}
          WHERE items.project_id = ? ${conditions.sql}`,
       )
-      .get(...join.params, projectId, ...conditions.params) as { count: number };
+      .get(...tables.params, ...join.params, projectId, ...conditions.params) as { count: number };
     return row.count;
   }
 
@@ -119,10 +120,12 @@ export class ItemViews {
     const match = matchExpression(request.filter);
     const join = modelJoin(request.filter);
     const conditions = filterConditions(request.filter);
-    const select = FILTERED_SELECT.replace("MATCH_EXPRESSION", match.sql)
+    const tables = withClause([searchTable(request.filter)]);
+    const select = tables.sql + FILTERED_SELECT.replace("MATCH_EXPRESSION", match.sql)
       .replace("MATCH_AT", matchAtExpression(request.filter))
+      .replace("ITEMS_FROM", itemsFrom(request.filter))
       .replace("MODEL_JOIN", join.sql);
-    const params = [...match.params, ...join.params, projectId];
+    const params = [...tables.params, ...match.params, ...join.params, projectId];
     if (request.filter.sort === "order") {
       return this.database
         .query(`${select} WHERE items.project_id = ? AND items.sequence > ? ${conditions.sql} ORDER BY sequence LIMIT ?`)
@@ -180,14 +183,17 @@ export class ItemViews {
 
   /** Sorts ids only: carrying the JSON columns through the sort made this ~15x slower. */
   private nextPending(projectId: string, excludedId: string, filter: ItemFilter): { id: string; at: number | null } | undefined {
+    const best = {
+      sql: "best AS (SELECT item_id, MAX(priority) AS priority FROM suggestions WHERE project_id = ? GROUP BY item_id)",
+      params: [projectId],
+    };
+    const tables = withClause([best, searchTable(filter)]);
     const join = modelJoin(filter);
     const conditions = filterConditions({ ...filter, status: "pending" });
     const row = this.database
       .query(
-        `WITH best AS (
-           SELECT item_id, MAX(priority) AS priority FROM suggestions WHERE project_id = ? GROUP BY item_id
-         )
-         SELECT items.id AS id, ${matchAtExpression(filter)} AS at FROM items
+        `${tables.sql}
+         SELECT items.id AS id, ${matchAtExpression(filter)} AS at ${itemsFrom(filter)}
          JOIN assets ON assets.project_id = items.project_id AND assets.id = items.asset_id
          LEFT JOIN annotations ON annotations.project_id = items.project_id AND annotations.item_id = items.id
          LEFT JOIN best ON best.item_id = items.id
@@ -195,7 +201,7 @@ export class ItemViews {
          WHERE items.project_id = ? AND items.id != ? ${conditions.sql}
          ORDER BY ${queueOrder(filter)} LIMIT 1`,
       )
-      .get(projectId, ...join.params, projectId, excludedId, ...conditions.params) as { id: string; at: number | null } | null;
+      .get(...tables.params, ...join.params, projectId, excludedId, ...conditions.params) as { id: string; at: number | null } | null;
     if (row === null) {
       return undefined;
     }
