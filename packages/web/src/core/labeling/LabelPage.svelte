@@ -117,7 +117,17 @@
 	<div class="text-dim flex justify-center py-16"><span class="loading"></span></div>
 {:else}
 	<div class="flex h-full min-h-0 flex-col">
-		<ItemHeader {detail} {pending} dirty={session.dirty} onleave={() => session.leave()} onneighbour={(offset) => session.openNeighbour(offset)} />
+		<ItemHeader
+			{detail}
+			{pending}
+			dirty={session.dirty}
+			canUndo={session.history.undo.length > 0}
+			canRedo={session.history.redo.length > 0}
+			onundo={() => session.undo()}
+			onredo={() => session.redo()}
+			onleave={() => session.leave()}
+			onneighbour={(offset) => session.openNeighbour(offset)}
+		/>
 
 		<div class="flex min-h-0 flex-1 {session.loading ? 'opacity-60' : ''}">
 			<div class="flex min-w-0 flex-1 flex-col gap-3 pb-1">
@@ -155,6 +165,7 @@
 							onselect={(range) => session.selectRange(range)}
 							onloop={(range) => session.toggleLoop(range)}
 							oncreate={(target, first, second) => session.createRange(target, first, second)}
+							onerase={(target, first, second) => session.eraseBetween(target, first, second)}
 							onchange={(previous, next) => session.replaceRange(previous, next)}
 							onaccept={(ghost) => session.acceptSuggestedRange(ghost)}
 							onarm={(target) => session.armLabel(target)}

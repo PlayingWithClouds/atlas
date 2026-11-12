@@ -1,8 +1,9 @@
 <script lang="ts">
 	// The item on a zoomable time axis: a filmstrip ruler with a large hover preview, and one track per
 	// label that is on, suggested as a range, or armed. Dragging in a track draws a range; bars move
-	// and resize by dragging, select on click, loop on double-click. Times on screen are asset seconds;
-	// ranges are stored item-relative.
+	// and resize by dragging, select on click, loop on double-click; Shift+drag erases. Hovering,
+	// scrubbing and dragging snap to range edges (Alt: no snapping). Times on screen are asset
+	// seconds; ranges are stored item-relative.
 	import type { Asset, Group, Range, Span } from '@atlas/contracts';
 	import type { MediaPlayerContribution } from '@atlas/contracts/web';
 	import MagnifyingGlassMinusIcon from 'phosphor-svelte/lib/MagnifyingGlassMinus';
@@ -12,7 +13,7 @@
 	import TrashIcon from 'phosphor-svelte/lib/Trash';
 	import type { PendingRange, RangeTarget } from './ranges';
 	import type { LabelTrack, RangeDragMode, SuggestedRange, TimelineWindow } from './timeline';
-	import { draggedRange, pageTo, panWindow, percentAt, secondsAtFraction, snapTime, tickStep, ticksOf, timelineWindow, zoomWindow } from './timeline';
+	import { draggedRange, nearestAnchor, pageTo, panWindow, percentAt, secondsAtFraction, snapToAnchors, tickStep, ticksOf, timelineWindow, zoomWindow } from './timeline';
 	import { formatClock } from '../shared/time';
 	import { settings } from '../settings/settings.svelte';
 	import { untrack } from 'svelte';
@@ -34,6 +35,7 @@
 		onselect,
 		onloop,
 		oncreate,
+		onerase,
 		onchange,
 		onaccept,
 		onarm,
@@ -64,6 +66,8 @@
 		onselect: (range: Range | undefined) => void;
 		onloop: (range: Range) => void;
 		oncreate: (target: RangeTarget, firstSeconds: number, secondSeconds: number) => void;
+		/** Shift+drag in a track: take that part out of the label. */
+		onerase: (target: RangeTarget, firstSeconds: number, secondSeconds: number) => void;
 		onchange: (previous: Range, next: Range) => void;
 		onaccept: (ghost: SuggestedRange) => void;
 		onarm: (target: RangeTarget) => void;
@@ -80,20 +84,23 @@
 	} = $props();
 
 	const FILMSTRIP_CELL_PIXELS = 128;
-	const SNAP_PIXELS = 6;
+	const SNAP_PIXELS = 8;
 	/** Pointer travel below this is a click, not a drag. */
 	const CLICK_PIXELS = 3;
 
 	type Drag =
 		| { kind: 'scrub' }
-		| { kind: 'create'; target: RangeTarget; anchor: number; current: number; startX: number }
+		| { kind: 'create'; target: RangeTarget; anchor: number; current: number; startX: number; erase: boolean }
 		| { kind: 'edit'; range: Range; mode: RangeDragMode; origin: number; preview: Range; startX: number; snapTo: number };
 
 	let container = $state<HTMLElement>();
 	let ruler = $state<HTMLElement>();
 	let laneWidth = $state(0);
 	let view = $state<TimelineWindow | undefined>(undefined);
-	let hover = $state<{ seconds: number; x: number } | undefined>(undefined);
+	/** Hovered asset seconds; `snapped` when pulled onto a range edge. */
+	let hover = $state<{ seconds: number; snapped: boolean } | undefined>(undefined);
+	/** Alt held during the last pointer event: snapping is off. */
+	let snapOff = false;
 	let drag = $state.raw<Drag | undefined>(undefined);
 	let lastPlayhead = 0;
 
@@ -120,6 +127,19 @@
 	const filmstripCount = $derived(Math.max(1, Math.floor(laneWidth / FILMSTRIP_CELL_PIXELS)));
 	const secondsPerPixel = $derived((axis.end - axis.start) / Math.max(1, laneWidth));
 	const zoomed = $derived(view !== undefined);
+	/** Every range edge on the timeline and the scene's edges, in asset seconds: what pointers snap to. */
+	const edgeAnchors = $derived.by(() => {
+		const anchors = [itemSpan.start, itemSpan.end];
+		if (trimmed !== undefined) {
+			anchors.push(trimmed.start, trimmed.end);
+		}
+		for (const track of tracks) {
+			for (const range of track.ranges) {
+				anchors.push(itemStart + range.start, itemStart + range.end);
+			}
+		}
+		return anchors;
+	});
 
 	// A new item starts fitted to its span.
 	$effect(() => {
@@ -197,7 +217,7 @@
 		}
 		// The pointer stays put while the axis moves under it.
 		if (hover !== undefined) {
-			hover = { ...hover, seconds: secondsAtClientX(wheelClientX) };
+			hover = hoverAt(wheelClientX);
 		}
 	}
 
@@ -260,11 +280,49 @@
 	}
 
 	/**
-	 * Snaps to frames, and to `anchor` when close. Edge drags pass the playhead from before they
-	 * started: they seek the playhead along, and snapping to that would pin the edge in place.
+	 * Snaps to frames, and to `anchor` or a range edge when close; `own` is a range whose edges are
+	 * left out (the one being dragged). Edge drags pass the playhead from before they started: they
+	 * seek the playhead along, and snapping to that would pin the edge in place.
 	 */
-	function snapped(seconds: number, anchor = playhead): number {
-		return snapTime(seconds, anchor, SNAP_PIXELS * secondsPerPixel, frameRate);
+	function snapped(seconds: number, anchor = playhead, own?: Range): number {
+		if (snapOff) {
+			return snapToAnchors(seconds, [], 0, frameRate);
+		}
+		return snapToAnchors(seconds, [anchor, ...anchorsWithout(own)], SNAP_PIXELS * secondsPerPixel, frameRate);
+	}
+
+	function anchorsWithout(own: Range | undefined): number[] {
+		if (own === undefined) {
+			return edgeAnchors;
+		}
+		const ownEdges = [itemStart + own.start, itemStart + own.end];
+		return edgeAnchors.filter((anchor) => !ownEdges.includes(anchor));
+	}
+
+	/** The edge a hovering or scrubbing pointer is pulled onto, if one is near. */
+	function edgeNear(seconds: number): number | undefined {
+		if (snapOff) {
+			return undefined;
+		}
+		return nearestAnchor(seconds, edgeAnchors, SNAP_PIXELS * secondsPerPixel);
+	}
+
+	function pointerSeconds(clientX: number): number {
+		const seconds = secondsAtClientX(clientX);
+		const edge = edgeNear(seconds);
+		if (edge === undefined) {
+			return seconds;
+		}
+		return edge;
+	}
+
+	function hoverAt(clientX: number): { seconds: number; snapped: boolean } {
+		const seconds = secondsAtClientX(clientX);
+		const edge = edgeNear(seconds);
+		if (edge === undefined) {
+			return { seconds, snapped: false };
+		}
+		return { seconds: edge, snapped: true };
 	}
 
 	function left(seconds: number): number {
@@ -276,6 +334,7 @@
 	}
 
 	function updateHover(event: PointerEvent): void {
+		snapOff = event.altKey;
 		if (container === undefined || ruler === undefined) {
 			return;
 		}
@@ -284,8 +343,7 @@
 			hover = undefined;
 			return;
 		}
-		const containerBox = container.getBoundingClientRect();
-		hover = { seconds: secondsAtClientX(event.clientX), x: event.clientX - containerBox.left };
+		hover = hoverAt(event.clientX);
 	}
 
 	// The page shows the hovered frame in the player (scrubbing too); dragging a bar's edge shows
@@ -301,7 +359,10 @@
 	// --- dragging --------------------------------------------------------------------------
 
 	function follow(onmove: (event: PointerEvent) => void, onup: (event: PointerEvent) => void): void {
-		const move = (event: PointerEvent) => onmove(event);
+		const move = (event: PointerEvent) => {
+			snapOff = event.altKey;
+			onmove(event);
+		};
 		const up = (event: PointerEvent) => {
 			window.removeEventListener('pointermove', move);
 			window.removeEventListener('pointerup', up);
@@ -317,11 +378,12 @@
 			return;
 		}
 		event.preventDefault();
+		snapOff = event.altKey;
 		drag = { kind: 'scrub' };
 		onscrub();
-		onseek(secondsAtClientX(event.clientX));
+		onseek(pointerSeconds(event.clientX));
 		follow(
-			(move) => onseek(secondsAtClientX(move.clientX)),
+			(move) => onseek(pointerSeconds(move.clientX)),
 			() => undefined
 		);
 	}
@@ -330,10 +392,17 @@
 		if (event.button !== 0 || event.target !== event.currentTarget) {
 			return;
 		}
+		startDrawing(event, track);
+	}
+
+	/** Drawing a range (Shift: an erased part) in a track, from wherever the pointer went down. */
+	function startDrawing(event: PointerEvent, track: LabelTrack): void {
 		event.preventDefault();
+		event.stopPropagation();
+		snapOff = event.altKey;
 		const target = { group: track.group.id, label: track.label.id };
 		const anchor = snapped(secondsAtClientX(event.clientX));
-		drag = { kind: 'create', target, anchor, current: anchor, startX: event.clientX };
+		drag = { kind: 'create', target, anchor, current: anchor, startX: event.clientX, erase: event.shiftKey };
 		follow(
 			(move) => {
 				if (drag?.kind === 'create') {
@@ -352,17 +421,26 @@
 		if (Math.abs(event.clientX - current.startX) < CLICK_PIXELS) {
 			onarm(target);
 			onselect(undefined);
-			onseek(secondsAtClientX(event.clientX));
+			onseek(pointerSeconds(event.clientX));
+			return;
+		}
+		if (current.erase) {
+			onerase(target, anchor, current.current);
 			return;
 		}
 		oncreate(target, anchor, current.current);
 	}
 
-	function startEdit(event: PointerEvent, range: Range, mode: RangeDragMode): void {
+	function startEdit(event: PointerEvent, track: LabelTrack, range: Range, mode: RangeDragMode): void {
 		if (event.button !== 0) {
 			return;
 		}
+		if (event.shiftKey) {
+			startDrawing(event, track);
+			return;
+		}
 		event.preventDefault();
+		snapOff = event.altKey;
 		event.stopPropagation();
 		const origin = secondsAtClientX(event.clientX);
 		drag = { kind: 'edit', range, mode, origin, preview: range, startX: event.clientX, snapTo: playhead };
@@ -377,17 +455,45 @@
 			return;
 		}
 		const preview = draggedRange(range, mode, secondsAtClientX(event.clientX) - origin, length);
-		const snappedPreview = snapEdges(preview, mode, drag.snapTo);
+		const snappedPreview = snapEdges(preview, mode, drag.snapTo, range);
 		drag = { ...drag, preview: snappedPreview };
 		seekToEdge(snappedPreview, mode);
 	}
 
-	/** Snaps the edge being dragged (both edges keep their distance when moving the bar). */
-	function snapEdges(range: Range, mode: RangeDragMode, anchor: number): Range {
+	/**
+	 * Snaps the edge being dragged; a moved bar keeps its length and snaps whichever of its edges is
+	 * nearer an anchor. `own` is the bar before the drag, whose old edges are no anchors.
+	 */
+	function snapEdges(range: Range, mode: RangeDragMode, anchor: number, own: Range): Range {
 		if (mode === 'end') {
-			return draggedRange(range, 'end', snapped(itemStart + range.end, anchor) - itemStart - range.end, length);
+			return draggedRange(range, 'end', snapped(itemStart + range.end, anchor, own) - itemStart - range.end, length);
 		}
-		return draggedRange(range, mode, snapped(itemStart + range.start, anchor) - itemStart - range.start, length);
+		if (mode === 'move') {
+			return draggedRange(range, 'move', moveSnapShift(range, anchor, own), length);
+		}
+		return draggedRange(range, mode, snapped(itemStart + range.start, anchor, own) - itemStart - range.start, length);
+	}
+
+	function moveSnapShift(range: Range, anchor: number, own: Range): number {
+		const startShift = snapped(itemStart + range.start, anchor, own) - itemStart - range.start;
+		const endShift = snapped(itemStart + range.end, anchor, own) - itemStart - range.end;
+		if (snapOff) {
+			return startShift;
+		}
+		const startAnchored = isAnchored(itemStart + range.start + startShift, anchor, own);
+		const endAnchored = isAnchored(itemStart + range.end + endShift, anchor, own);
+		// An edge that lands on an anchor beats one that only lands on a frame.
+		if (endAnchored && !startAnchored) {
+			return endShift;
+		}
+		if (endAnchored && Math.abs(endShift) < Math.abs(startShift)) {
+			return endShift;
+		}
+		return startShift;
+	}
+
+	function isAnchored(seconds: number, anchor: number, own: Range): boolean {
+		return [anchor, ...anchorsWithout(own)].some((candidate) => Math.abs(candidate - seconds) < 1e-9);
 	}
 
 	let pendingSeek: number | undefined;
@@ -441,14 +547,14 @@
 		return range;
 	}
 
-	function creatingIn(track: LabelTrack): { start: number; end: number } | undefined {
+	function creatingIn(track: LabelTrack): { start: number; end: number; erase: boolean } | undefined {
 		if (drag === undefined || drag.kind !== 'create') {
 			return undefined;
 		}
 		if (drag.target.group !== track.group.id || drag.target.label !== track.label.id) {
 			return undefined;
 		}
-		return { start: Math.min(drag.anchor, drag.current), end: Math.max(drag.anchor, drag.current) };
+		return { start: Math.min(drag.anchor, drag.current), end: Math.max(drag.anchor, drag.current), erase: drag.erase };
 	}
 
 	function pendingIn(track: LabelTrack): { start: number; end: number } | undefined {
@@ -499,9 +605,9 @@
 
 	function trackTitle(track: LabelTrack): string {
 		if (track.whole) {
-			return `${track.group.label}: ${track.label.name}, for the entire scene. Drag inside the track to mark only the parts where it happens.`;
+			return `${track.group.label}: ${track.label.name}, for the entire scene. Drag inside the track to mark only the parts where it happens, Shift+drag to cut a part out.`;
 		}
-		return `${track.group.label}: ${track.label.name}. Drag in the track to add a range.`;
+		return `${track.group.label}: ${track.label.name}. Drag in the track to add a range, Shift+drag to erase one.`;
 	}
 </script>
 
@@ -611,8 +717,8 @@
 						<div
 							role="button"
 							tabindex="-1"
-							title="{describe(shown)}. Drag to move, edges to resize, double-click to loop it."
-							onpointerdown={(event) => startEdit(event, range, 'move')}
+							title="{describe(shown)}. Drag to move, edges to resize, Shift+drag to erase a part, double-click to loop it."
+							onpointerdown={(event) => startEdit(event, track, range, 'move')}
 							ondblclick={() => onloop(range)}
 							class="group/bar absolute inset-y-0 cursor-grab rounded-sm {barClass(range)}"
 							style="left: {left(itemStart + shown.start)}%; width: {widthBetween(itemStart + shown.start, itemStart + shown.end)}%"
@@ -623,10 +729,10 @@
 								<span class="opacity-60">{formatClock(shown.end - shown.start, 1)}</span>
 							</span>
 							<!-- Edge handles reach a few pixels past the bar, so short bars stay resizable. -->
-							<div role="presentation" class="absolute inset-y-0 -left-1.5 z-10 flex w-3 cursor-ew-resize justify-center" onpointerdown={(event) => startEdit(event, range, 'start')}>
+							<div role="presentation" class="absolute inset-y-0 -left-1.5 z-10 flex w-3 cursor-ew-resize justify-center" onpointerdown={(event) => startEdit(event, track, range, 'start')}>
 								<span class="my-1 w-1 rounded-full {active ? 'bg-white' : 'bg-white/0 group-hover/bar:bg-white/60'}"></span>
 							</div>
-							<div role="presentation" class="absolute inset-y-0 -right-1.5 z-10 flex w-3 cursor-ew-resize justify-center" onpointerdown={(event) => startEdit(event, range, 'end')}>
+							<div role="presentation" class="absolute inset-y-0 -right-1.5 z-10 flex w-3 cursor-ew-resize justify-center" onpointerdown={(event) => startEdit(event, track, range, 'end')}>
 								<span class="my-1 w-1 rounded-full {active ? 'bg-white' : 'bg-white/0 group-hover/bar:bg-white/60'}"></span>
 							</div>
 							{#if active}
@@ -636,7 +742,9 @@
 						</div>
 					{/each}
 
-					{#if creating}
+					{#if creating && creating.erase}
+						<div class="erasing border-red pointer-events-none absolute inset-y-0 z-20 rounded-sm border" style="left: {left(creating.start)}%; width: {widthBetween(creating.start, creating.end)}%"></div>
+					{:else if creating}
 						<div class="bg-violet/40 border-violet pointer-events-none absolute inset-y-0 rounded-sm border" style="left: {left(creating.start)}%; width: {widthBetween(creating.start, creating.end)}%"></div>
 					{/if}
 					{#if drawing}
@@ -664,7 +772,11 @@
 		<!-- playhead and hover line across ruler and tracks -->
 		<div class="pointer-events-none absolute inset-y-0 z-20 w-px bg-white" style="left: calc(var(--lane-left) + var(--lane-width) * {left(playhead) / 100})"></div>
 		{#if hover}
-			<div class="pointer-events-none absolute inset-y-0 z-20 w-px bg-white/30" style="left: {hover.x}px"></div>
+			<div
+				class="pointer-events-none absolute inset-y-0 z-20 {hover.snapped ? 'bg-violet w-0.5' : 'w-px bg-white/30'}"
+				style="left: calc(var(--lane-left) + var(--lane-width) * {left(hover.seconds) / 100})"
+				title={hover.snapped ? 'On a range edge' : undefined}
+			></div>
 		{/if}
 	</div>
 
@@ -699,7 +811,7 @@
 				</button>
 			</div>
 		{:else}
-			<span class="min-w-0 flex-1 truncate"><span class="font-mono">/</span> start a label at the playhead · <span class="font-mono">]</span> end it · <span class="font-mono">S</span> pick suggestions from here · drag in a track or a bar's edges · <span class="font-mono">?</span> all keys</span>
+			<span class="min-w-0 flex-1 truncate"><span class="font-mono">/</span> start a label at the playhead · <span class="font-mono">]</span> end it · <span class="font-mono">S</span> pick suggestions from here · drag in a track or a bar's edges (Shift: erase) · <span class="font-mono">Ctrl+Z</span> undo · <span class="font-mono">?</span> all keys</span>
 		{/if}
 		<div class="flex shrink-0 gap-0.5">
 			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" onmousedown={(event) => event.preventDefault()} onclick={() => zoomBy(settings.value.zoomStep)} title="Zoom out (wheel, -)"><MagnifyingGlassMinusIcon size={14} /></button>
@@ -718,6 +830,10 @@
 		z-index: 15;
 		background: color-mix(in srgb, var(--bg) 72%, transparent);
 		backdrop-filter: grayscale(1);
+	}
+
+	.erasing {
+		background: repeating-linear-gradient(-45deg, rgb(248 113 113 / 0.35) 0 4px, rgb(0 0 0 / 0.35) 4px 8px);
 	}
 
 	.edge-time {

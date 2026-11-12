@@ -5,11 +5,17 @@
 	import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeft';
 	import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeft';
 	import CaretRightIcon from 'phosphor-svelte/lib/CaretRight';
+	import ArrowUUpLeftIcon from 'phosphor-svelte/lib/ArrowUUpLeft';
+	import ArrowUUpRightIcon from 'phosphor-svelte/lib/ArrowUUpRight';
 
 	let {
 		detail,
 		pending,
 		dirty,
+		canUndo,
+		canRedo,
+		onundo,
+		onredo,
 		onleave,
 		onneighbour
 	}: {
@@ -17,6 +23,10 @@
 		/** Items still waiting in the project queue. */
 		pending: number;
 		dirty: boolean;
+		canUndo: boolean;
+		canRedo: boolean;
+		onundo: () => void;
+		onredo: () => void;
 		onleave: () => void;
 		onneighbour: (offset: 1 | -1) => void;
 	} = $props();
@@ -44,6 +54,14 @@
 	<StatusChip status={detail.status} />
 	{#if dirty}<span class="badge bg-amber-soft text-amber">unsaved</span>{/if}
 	<div class="ml-auto flex items-center gap-2">
+		<div class="flex items-center">
+			<button type="button" tabindex="-1" class="btn btn-ghost btn-sm btn-square" disabled={!canUndo} onmousedown={(event) => event.preventDefault()} onclick={onundo} aria-label="Undo" title="Undo (Ctrl+Z)">
+				<ArrowUUpLeftIcon size={15} />
+			</button>
+			<button type="button" tabindex="-1" class="btn btn-ghost btn-sm btn-square" disabled={!canRedo} onmousedown={(event) => event.preventDefault()} onclick={onredo} aria-label="Redo" title="Redo (Ctrl+Shift+Z)">
+				<ArrowUUpRightIcon size={15} />
+			</button>
+		</div>
 		<span class="text-dim text-sm"><span class="text-default font-semibold">{pending}</span> pending</span>
 		<button type="button" class="btn btn-ghost btn-sm btn-square" disabled={detail.previous === undefined} onclick={() => onneighbour(-1)} aria-label="Previous scene of this video" title="Previous scene (Shift+←)">
 			<CaretLeftIcon size={14} />

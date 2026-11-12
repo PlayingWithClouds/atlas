@@ -26,7 +26,7 @@ import {
 import type { Draft } from './draft';
 import { actionForKey, isRepeatable, pressOf } from './keyboardMap';
 import type { KeyPress, LabelAction } from './keyboardMap';
-import { MIN_RANGE_SECONDS, addRange, closePending, deleteRange, effectiveSpan, findPending, isSameSpan, itemTimeOf, refineRange, replaceRange, restartPending, togglePending, trimEdge } from './ranges';
+import { MIN_RANGE_SECONDS, addRange, closePending, deleteRange, eraseRange, effectiveSpan, findPending, isSameSpan, itemTimeOf, refineRange, replaceRange, restartPending, togglePending, trimEdge } from './ranges';
 import type { PendingRange, RangeTarget } from './ranges';
 import { acceptProposals, chooseSuggestion } from './suggestions';
 import { confidentAdditions, emptyAutoAdded, personsAnnotation, rangeKey, valueKey } from './liveSuggestions';
@@ -44,6 +44,8 @@ const LIVE_SCENE_TIMEOUT_MS = 120_000;
 /** Everything the labeling screen knows and can do for one item at a time. */
 /** How long the leader waits for the key that completes its sequence. */
 const LEADER_WINDOW_MS = 1500;
+/** Undo steps kept per item. */
+const HISTORY_LIMIT = 200;
 
 function tookMessage(count: number): string {
   if (count === 0) {
@@ -102,6 +104,9 @@ export class LabelingSession {
   private liveTimer: ReturnType<typeof setTimeout> | undefined;
   private liveAbort: AbortController | undefined;
   private lastLiveRequest = '';
+
+  /** Drafts before each edit (undo) and after each undo (redo); both cleared when an item opens. */
+  history = $state.raw<{ undo: Draft[]; redo: Draft[] }>({ undo: [], redo: [] });
 
   private loadedFingerprint = $state('');
   private lastTouchedLabel = $state.raw<Record<string, string>>({});
@@ -278,6 +283,7 @@ export class LabelingSession {
     this.loopedRange = undefined;
     this.serverProblems = [];
     this.lastTouchedLabel = {};
+    this.history = { undo: [], redo: [] };
     this.focusedGroupId = this.focusable[0]?.id;
     this.restartPlayback(sameAsset);
     this.resetLive();
@@ -397,9 +403,60 @@ export class LabelingSession {
     if (this.taxonomy === undefined || this.loading) {
       return;
     }
-    this.draft = change(this.taxonomy, this.draft);
+    const before = this.draft;
+    this.draft = change(this.taxonomy, before);
+    this.remember(before);
     this.serverProblems = [];
     this.scheduleLive();
+  }
+
+  /** Records `before` as an undo step when the draft really changed (not just a panel toggle). */
+  private remember(before: Draft): void {
+    if (this.taxonomy === undefined || before === this.draft) {
+      return;
+    }
+    if (fingerprintOf(this.taxonomy, before) === fingerprintOf(this.taxonomy, this.draft)) {
+      return;
+    }
+    this.history = { undo: [...this.history.undo, before].slice(-HISTORY_LIMIT), redo: [] };
+  }
+
+  undo(): void {
+    const previous = this.history.undo.at(-1);
+    if (previous === undefined || this.loading) {
+      this.say('Nothing to undo');
+      return;
+    }
+    this.history = { undo: this.history.undo.slice(0, -1), redo: [...this.history.redo, this.draft] };
+    this.restore(previous);
+  }
+
+  redo(): void {
+    const next = this.history.redo.at(-1);
+    if (next === undefined || this.loading) {
+      this.say('Nothing to redo');
+      return;
+    }
+    this.history = { undo: [...this.history.undo, this.draft], redo: this.history.redo.slice(0, -1) };
+    this.restore(next);
+  }
+
+  /** Puts a draft from the history back; a selection or loop of a range that is gone ends. */
+  private restore(draft: Draft): void {
+    this.draft = draft;
+    this.dropStaleSelection();
+    this.serverProblems = [];
+    this.scheduleLive();
+  }
+
+  private dropStaleSelection(): void {
+    const draft = this.draft;
+    if (this.selectedRange !== undefined && !draft.ranges.includes(this.selectedRange)) {
+      this.selectedRange = undefined;
+    }
+    if (this.loopedRange !== undefined && !draft.ranges.includes(this.loopedRange)) {
+      this.loopedRange = undefined;
+    }
   }
 
   focusGroup(groupId: string): void {
@@ -701,6 +758,20 @@ export class LabelingSession {
     this.selectedRange = range;
   }
 
+  /** Takes the part between two asset times out of a label (Shift+drag in its track). */
+  eraseBetween(target: RangeTarget, firstSeconds: number, secondSeconds: number): void {
+    const first = itemTimeOf(firstSeconds, this.itemStart, this.length);
+    const second = itemTimeOf(secondSeconds, this.itemStart, this.length);
+    const start = Math.min(first, second);
+    const end = Math.max(first, second);
+    if (end - start < MIN_RANGE_SECONDS) {
+      return;
+    }
+    this.armLabel(target);
+    this.edit((taxonomy, draft) => eraseRange(taxonomy, draft, target, start, end, this.length));
+    this.dropStaleSelection();
+  }
+
   /** Swaps a range for its edited copy; the selection and loop follow it. */
   replaceRange(previous: Range, next: Range): void {
     this.edit((taxonomy, draft) => replaceRange(taxonomy, draft, previous, next));
@@ -862,6 +933,8 @@ export class LabelingSession {
       wholeItem: () => this.wholeItem(),
       leader: () => this.startLeader(),
       acceptHere: () => void this.acceptSuggestionsHere(),
+      undo: () => this.undo(),
+      redo: () => this.redo(),
     };
     simple[action.kind]?.();
     this.performWithArgument(action);
@@ -1016,6 +1089,7 @@ export class LabelingSession {
       next = addRange(this.taxonomy, next, range);
     }
     this.draft = next;
+    this.remember(before);
     this.rememberAutoAdded(before, next);
     this.say(addedMessage(count));
   }
