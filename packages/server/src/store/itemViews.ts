@@ -111,18 +111,37 @@ export class ItemViews {
 
   /** Pending items by highest suggestion priority, items without priority last, then push order. */
   queueNext(projectId: string, after: string | undefined): QueueNext {
-    const rows = this.database
-      .query(
-        `${VIEW_SELECT}
-         WHERE items.project_id = ? AND annotations.item_id IS NULL AND items.id != ?
-         ORDER BY priority IS NULL, priority DESC, items.sequence LIMIT 1`,
-      )
-      .all(projectId, excludedItemId(after)) as ViewRow[];
     const pending = this.countPending(projectId);
-    if (rows.length === 0) {
+    const nextId = this.nextPendingId(projectId, excludedItemId(after));
+    if (nextId === undefined) {
       return { pending };
     }
-    return { item: viewOf(rows[0]), pending };
+    const row = this.rowOf(projectId, nextId);
+    if (row === undefined) {
+      return { pending };
+    }
+    return { item: viewOf(row), pending };
+  }
+
+  /** Sorts ids only: carrying the JSON columns through the sort made this ~15x slower. */
+  private nextPendingId(projectId: string, excludedId: string): string | undefined {
+    const row = this.database
+      .query(
+        `WITH best AS (
+           SELECT item_id, MAX(priority) AS priority FROM suggestions WHERE project_id = ? GROUP BY item_id
+         )
+         SELECT items.id AS id FROM items
+         JOIN assets ON assets.project_id = items.project_id AND assets.id = items.asset_id
+         LEFT JOIN annotations ON annotations.project_id = items.project_id AND annotations.item_id = items.id
+         LEFT JOIN best ON best.item_id = items.id
+         WHERE items.project_id = ? AND annotations.item_id IS NULL AND items.id != ?
+         ORDER BY best.priority IS NULL, best.priority DESC, items.sequence LIMIT 1`,
+      )
+      .get(projectId, projectId, excludedId) as { id: string } | null;
+    if (row === null) {
+      return undefined;
+    }
+    return row.id;
   }
 
   private countPending(projectId: string): number {
