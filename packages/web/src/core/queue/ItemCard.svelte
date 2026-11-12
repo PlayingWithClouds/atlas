@@ -113,7 +113,7 @@
 				<span class="text-dim font-mono text-2xs">{formatSpan(view.item.span)}</span>
 			{/if}
 			{#if view.match !== undefined}
-				<span class="badge badge-sm badge-outline font-mono" title="Model probability for the filtered label">{Math.round(view.match * 100)}%</span>
+				<span class="badge badge-sm badge-outline font-mono" title="How well it matches the filter (model probability, or description match)">{Math.round(view.match * 100)}%</span>
 			{/if}
 			{#if view.priority !== undefined}
 				<span class="text-faint ml-auto font-mono text-2xs" title="Priority">p {view.priority.toFixed(2)}</span>

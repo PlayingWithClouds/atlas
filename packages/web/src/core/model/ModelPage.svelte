@@ -6,6 +6,9 @@
 	import { messageOf } from '../shared/errors';
 	import PageHeader from '../shared/PageHeader.svelte';
 	import { filterSearch } from '../queue/itemFilter';
+	import { bandText } from '../queue/apiFilter';
+	import MarginSelect from '../queue/MarginSelect.svelte';
+	import { settings } from '../settings/settings.svelte';
 	import { queuePath } from '../queue/itemLink';
 
 	let { params }: { params: Record<string, string> } = $props();
@@ -52,7 +55,7 @@
 	const subtitle = $derived.by(() => {
 		if (overview === undefined) return '';
 		if (overview.source === undefined) return `${overview.pending} pending · no suggestions yet`;
-		return `Source "${overview.source}" · ${overview.suggested} of ${overview.pending} pending items suggested · unsure = 25–75%`;
+		return `Source "${overview.source}" · ${overview.suggested} of ${overview.pending} pending items suggested · unsure = ${bandText(overview.margin)}`;
 	});
 
 	function labelRows(group: Group, groupOverview: ModelGroupOverview) {
@@ -81,7 +84,7 @@
 	async function load() {
 		try {
 			const [loadedOverview, project] = await Promise.all([
-				ctx.api.get<ModelOverview>(`/projects/${encodeURIComponent(projectId)}/model`),
+				ctx.api.get<ModelOverview>(`/projects/${encodeURIComponent(projectId)}/model?margin=${settings.value.unsureMargin}`),
 				ctx.api.get<Project>(`/projects/${encodeURIComponent(projectId)}`)
 			]);
 			overview = loadedOverview;
@@ -99,8 +102,11 @@
 
 	$effect(() => {
 		void projectId;
+		void settings.value.unsureMargin;
 		untrack(() => void load());
 	});
+
+	const band = $derived(bandText(settings.value.unsureMargin));
 
 	onMount(() => {
 		const unsubscribe = ctx.live.subscribe((signal) => {
@@ -115,7 +121,12 @@
 </script>
 
 <div class="p-6">
-	<PageHeader title="Model" {subtitle} />
+	<PageHeader title="Model" {subtitle}>
+		{#snippet actions()}
+			<span class="text-dim text-xs">Unsure between</span>
+			<MarginSelect />
+		{/snippet}
+	</PageHeader>
 
 	{#if error}<div class="alert alert-error mb-3">{error}</div>{/if}
 
@@ -129,7 +140,7 @@
 				<section class="bg-surface border-line rounded-lg border">
 					<header class="border-line flex items-center gap-2 border-b px-3 py-2">
 						<h2 class="text-default text-sm font-semibold">{row.group.label}</h2>
-						<a href={unsureLink(row.group.id)} class="text-amber ml-auto text-xs hover:underline" title="Pending items with any label of this group at 25–75%">
+						<a href={unsureLink(row.group.id)} class="text-amber ml-auto text-xs hover:underline" title="Pending items with any label of this group at {band}">
 							{row.overview.unsure} unsure →
 						</a>
 					</header>
@@ -139,7 +150,7 @@
 								<th class="px-3 py-1.5 text-left font-normal">Label</th>
 								<th class="px-2 py-1.5 text-right font-normal" title="Labeled items with it">Labeled</th>
 								<th class="px-2 py-1.5 text-right font-normal" title="Pending items the model gives it at least 50%">Likely</th>
-								<th class="px-3 py-1.5 text-left font-normal" title="Pending items at 25–75%">Unsure</th>
+								<th class="px-3 py-1.5 text-left font-normal" title="Pending items at {band}">Unsure</th>
 							</tr>
 						</thead>
 						<tbody>

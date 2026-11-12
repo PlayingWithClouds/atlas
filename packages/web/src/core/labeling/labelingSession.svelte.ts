@@ -2,6 +2,7 @@ import { isGroupActive, itemLength, validateAnnotation } from '@atlas/contracts'
 import type { AnnotationStatus, Group, ItemDetail, ItemView, Project, Range, Suggestion } from '@atlas/contracts';
 import type { PlayerHandle } from '@atlas/contracts/web';
 import type { Context } from '@neoworks/extension-system';
+import { apiFilterSearch } from '../queue/apiFilter';
 import { currentFilter, filterSearch, hasFilter } from '../queue/itemFilter';
 import type { QueueFilter } from '../queue/itemFilter';
 import { apiItemPath, labelPath, queuePath } from '../queue/itemLink';
@@ -865,7 +866,7 @@ export class LabelingSession {
   private async openNext(afterItemId: string): Promise<void> {
     const filter = currentFilter();
     const next = await this.ctx.api.get<{ item?: ItemView; pending: number }>(
-      `/projects/${encodeURIComponent(this.projectId())}/queue/next${filterSearch(filter, { after: afterItemId })}`,
+      `/projects/${encodeURIComponent(this.projectId())}/queue/next${apiFilterSearch(filter, { after: afterItemId })}`,
     );
     if (next.item === undefined) {
       this.ctx.toasts.push(finishedMessage(filter), 'success');

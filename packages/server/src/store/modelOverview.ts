@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { ModelGroupOverview, ModelOverview, Taxonomy } from "@atlas/contracts";
-import { LIKELY, UNSURE_HIGH, UNSURE_LOW } from "./itemFilter";
+import { LIKELY, bandOf } from "./itemFilter";
+import type { UnsureBand } from "./itemFilter";
 
 interface LabelCountRow {
   group_id: string;
@@ -46,20 +47,22 @@ function countOf<Key>(counts: Map<Key, number>, key: Key): number {
 export class ModelOverviewQuery {
   constructor(private readonly database: Database) {}
 
-  overview(projectId: string, source: string | undefined, taxonomy: Taxonomy): ModelOverview {
+  overview(projectId: string, source: string | undefined, taxonomy: Taxonomy, margin: number): ModelOverview {
     const pending = this.countPending(projectId);
     if (source === undefined) {
-      return { pending, suggested: 0, groups: this.assemble(taxonomy, new Map(), new Map(), new Map()) };
+      return { margin, pending, suggested: 0, groups: this.assemble(taxonomy, new Map(), new Map(), new Map()) };
     }
+    const band = bandOf(margin);
     return {
       source,
+      margin,
       pending,
       suggested: this.countSuggested(projectId, source),
       groups: this.assemble(
         taxonomy,
-        this.labelCounts(projectId, source),
+        this.labelCounts(projectId, source, band),
         this.labeledCounts(projectId),
-        this.groupUnsure(projectId, source),
+        this.groupUnsure(projectId, source, band),
       ),
     };
   }
@@ -86,7 +89,7 @@ export class ModelOverviewQuery {
     }));
   }
 
-  private labelCounts(projectId: string, source: string): Map<CountKey, LabelCountRow> {
+  private labelCounts(projectId: string, source: string, band: UnsureBand): Map<CountKey, LabelCountRow> {
     const rows = this.database
       .query(
         `SELECT group_entry.key AS group_id, label_entry.key AS label_id,
@@ -98,11 +101,11 @@ export class ModelOverviewQuery {
          WHERE items.project_id = ? AND annotations.item_id IS NULL
          GROUP BY group_entry.key, label_entry.key`,
       )
-      .all(LIKELY, UNSURE_LOW, UNSURE_HIGH, source, projectId) as LabelCountRow[];
+      .all(LIKELY, band.low, band.high, source, projectId) as LabelCountRow[];
     return new Map(rows.map((row) => [keyOf(row.group_id, row.label_id), row]));
   }
 
-  private groupUnsure(projectId: string, source: string): Map<string, number> {
+  private groupUnsure(projectId: string, source: string, band: UnsureBand): Map<string, number> {
     const rows = this.database
       .query(
         `SELECT group_entry.key AS group_id, COUNT(DISTINCT items.id) AS unsure
@@ -112,7 +115,7 @@ export class ModelOverviewQuery {
          WHERE items.project_id = ? AND annotations.item_id IS NULL AND label_entry.value BETWEEN ? AND ?
          GROUP BY group_entry.key`,
       )
-      .all(source, projectId, UNSURE_LOW, UNSURE_HIGH) as GroupCountRow[];
+      .all(source, projectId, band.low, band.high) as GroupCountRow[];
     return new Map(rows.map((row) => [row.group_id, row.unsure]));
   }
 

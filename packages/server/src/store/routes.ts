@@ -27,6 +27,8 @@ function filterQueryOf(request: Request): ItemFilterQueryText {
     q: queryOf(request, "q"),
     label: queryOf(request, "label"),
     unsure: queryOf(request, "unsure"),
+    margin: queryOf(request, "margin"),
+    similar: queryOf(request, "similar"),
     sort: queryOf(request, "sort"),
   };
 }
@@ -74,7 +76,9 @@ function registerReadRoutes(ctx: Context, store: StoreCore): void {
   register(ctx, "GET", "/:project/queue/next", (request, params) =>
     store.items.queueNext(params.project, queryOf(request, "after"), filterQueryOf(request)),
   );
-  register(ctx, "GET", "/:project/model", (_request, params) => store.items.modelOverview(params.project));
+  register(ctx, "GET", "/:project/model", (request, params) =>
+    store.items.modelOverview(params.project, queryOf(request, "margin")),
+  );
 }
 
 function registerAnnotationRoutes(ctx: Context, store: StoreCore): void {

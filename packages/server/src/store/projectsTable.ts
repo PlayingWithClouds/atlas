@@ -8,6 +8,7 @@ interface ProjectRow {
   taxonomy_version: number;
   prefill_source: string | null;
   live_suggestions: string | null;
+  semantic_search: string | null;
 }
 
 interface SummaryRow {
@@ -52,6 +53,9 @@ function projectOf(row: ProjectRow): Project {
   if (row.live_suggestions !== null) {
     project.liveSuggestions = row.live_suggestions;
   }
+  if (row.semantic_search !== null) {
+    project.semanticSearch = row.semantic_search;
+  }
   return project;
 }
 
@@ -84,6 +88,10 @@ export class ProjectsTable {
 
   setPrefillSource(projectId: string, prefillSource: string | null): void {
     this.database.query("UPDATE projects SET prefill_source = ? WHERE id = ?").run(prefillSource, projectId);
+  }
+
+  setSemanticSearch(projectId: string, url: string | null): void {
+    this.database.query("UPDATE projects SET semantic_search = ? WHERE id = ?").run(url, projectId);
   }
 
   setLiveSuggestions(projectId: string, url: string | null): void {

@@ -147,6 +147,11 @@ export interface Project {
    * `GET <url>?item=<item id>&at=<item seconds>` → `{ ranges: (Range & { score })[] }`.
    */
   liveSuggestions?: string;
+  /**
+   * URL atlas asks to rank items by a text query (the queue's semantic search):
+   * `GET <url>?q=<text>&limit=<n>` → `{ items: { itemId: string; score: number }[] }`, best first.
+   */
+  semanticSearch?: string;
 }
 
 export interface ProjectInput {
@@ -213,6 +218,10 @@ export interface ItemFilterQuery {
   label?: string;
   /** `group` or `group.label`: the model is unsure about it. */
   unsure?: string;
+  /** Unsure means a probability within this distance of 0.5 (default 0.15, from 0.05 to 0.45). */
+  margin?: number;
+  /** Free text: items the project's semantic search ranks best for it, most similar first. */
+  similar?: string;
   /** order: push order (default); queue: as the queue serves them; match: by `match`. */
   sort?: "order" | "queue" | "match";
 }
@@ -221,6 +230,8 @@ export interface ItemFilterQuery {
 export interface ModelOverview {
   /** Suggestion source the overview and the label filters read; absent without suggestions. */
   source?: string;
+  /** Unsure counts are probabilities within this distance of 0.5. */
+  margin: number;
   pending: number;
   /** Pending items the model has suggested values for. */
   suggested: number;
@@ -248,6 +259,10 @@ export interface ItemPage {
   items: ItemView[];
   /** Absent on the last page. */
   cursor?: string;
+  /** With q, label, unsure or similar set: items matching the filter, in this status. */
+  total?: number;
+  /** With q, label, unsure or similar set: pending items matching the filter. */
+  pending?: number;
 }
 
 /** `GET /api/projects/:project/items/:item`: everything the labeling screen needs. */

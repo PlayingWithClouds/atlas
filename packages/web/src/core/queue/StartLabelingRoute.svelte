@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import { kernelContext } from '../../kernel/context';
 	import { messageOf } from '../shared/errors';
+	import { apiFilterSearch } from './apiFilter';
 	import { currentFilter, filterSearch } from './itemFilter';
 	import { labelPath, queuePath } from './itemLink';
 
@@ -15,7 +16,7 @@
 		const projectId = params.project;
 		const search = filterSearch(currentFilter());
 		try {
-			const next = await ctx.api.get<QueueNext>(`/projects/${encodeURIComponent(projectId)}/queue/next${search}`);
+			const next = await ctx.api.get<QueueNext>(`/projects/${encodeURIComponent(projectId)}/queue/next${apiFilterSearch(currentFilter())}`);
 			if (next.item === undefined) {
 				ctx.toasts.push('Nothing pending: the queue is empty', 'info');
 				ctx.router.navigate(queuePath(projectId), { replace: true });

@@ -47,6 +47,8 @@ export interface Settings {
   liveTimeoutMs: number;
   /** Live suggestions at least this sure are added to the draft by themselves; above 1 turns that off. */
   autoAcceptThreshold: number;
+  /** The model counts as unsure within this distance of 50 % (queue filter, Model page). */
+  unsureMargin: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -58,7 +60,8 @@ export const DEFAULT_SETTINGS: Settings = {
   zoomStep: 1.6,
   expandMoreGroups: true,
   liveTimeoutMs: 3000,
-  autoAcceptThreshold: 0.9
+  autoAcceptThreshold: 0.9,
+  unsureMargin: 0.15
 };
 
 function withDefaults(raw: unknown): Settings {

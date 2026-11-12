@@ -119,6 +119,12 @@
 		settings.update({ [field]: value });
 	}
 
+	function setMargin(raw: string) {
+		const value = Number(raw);
+		if (!Number.isFinite(value) || value < 0.05 || value > 0.45) return;
+		settings.update({ unsureMargin: value });
+	}
+
 	function leaderName(): string {
 		if (settings.value.leader === ' ') {
 			return 'Space';
@@ -255,6 +261,8 @@
 			<input id="live-timeout" class="input input-sm" type="number" min="100" step="100" value={settings.value.liveTimeoutMs} onchange={(event) => setNumber('liveTimeoutMs', event.currentTarget.value, 100)} />
 			<label class="text-default" for="auto-accept">Add labels by themselves from <span class="text-dim text-sm">(model certainty 0.5–1; above 1 turns it off)</span></label>
 			<input id="auto-accept" class="input input-sm" type="number" min="0.5" step="0.01" value={settings.value.autoAcceptThreshold} onchange={(event) => setNumber('autoAcceptThreshold', event.currentTarget.value, 0.5)} />
+			<label class="text-default" for="unsure-margin">Model counts as unsure within <span class="text-dim text-sm">(distance from 50 %, 0.05–0.45; queue filter and Model page)</span></label>
+			<input id="unsure-margin" class="input input-sm" type="number" min="0.05" max="0.45" step="0.05" value={settings.value.unsureMargin} onchange={(event) => setMargin(event.currentTarget.value)} />
 		</div>
 	</section>
 
