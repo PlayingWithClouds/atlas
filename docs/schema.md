@@ -221,7 +221,8 @@ them in its URL, and labeling carries them on, so "next" stays inside the filter
 - `similar=<text>`: only items the project's `semanticSearch` adapter returns for the text, with
   its score as `match`; `sort=match` and `queue/next` serve the most similar first. atlas asks
   `GET <semanticSearch>?q=<text>&limit=2000` → `{ items: { itemId, score }[] }` (best first,
-  only items worth showing) and keeps the answer five minutes.
+  only items worth showing, score 0–1). Any ranking works behind it: embeddings, a text index,
+  a classifier and keeps the answer five minutes.
 - `sort=order|queue|match`: push order (default, cursor = sequence), queue order, or by the
   model's probability (`label`: highest first; `unsure`: closest to 0.5 first). The last two page
   by offset. Each item carries the probability as `match`. A list narrowed by `q`, `label`,

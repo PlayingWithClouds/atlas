@@ -149,7 +149,8 @@ export interface Project {
   liveSuggestions?: string;
   /**
    * URL atlas asks to rank items by a text query (the queue's semantic search):
-   * `GET <url>?q=<text>&limit=<n>` → `{ items: { itemId: string; score: number }[] }`, best first.
+   * `GET <url>?q=<text>&limit=<n>` → `{ items: { itemId: string; score: number }[] }`, best first,
+   * score from 0 to 1 (shown as a percentage). How the adapter ranks is its own business.
    */
   semanticSearch?: string;
 }
