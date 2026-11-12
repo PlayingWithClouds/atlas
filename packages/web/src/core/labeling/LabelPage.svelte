@@ -199,6 +199,9 @@
 					{#if session.notice}
 						<div class="text-amber px-1 text-sm">{session.notice}</div>
 					{/if}
+					{#if session.liveUpdating}
+						<div class="text-dim flex items-center gap-2 px-1 text-sm"><span class="loading loading-xs"></span>Updating suggestions…</div>
+					{/if}
 
 					<div class="flex gap-2">
 						<button type="button" tabindex="-1" class="btn flex-1" disabled={session.saving} onmousedown={(event) => event.preventDefault()} onclick={() => void session.save('skipped')}>
