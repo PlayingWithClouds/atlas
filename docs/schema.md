@@ -168,6 +168,12 @@ interface Suggestion {
   `{ ranges: (Range & { score })[] }`: the labels on at that moment, each running from `at`
   to where the adapter predicts it ends. The URL must allow the browser (CORS). Without it,
   or when it does not answer, S uses the pushed suggestions' ranges.
+- **Live scene.** While a scene is open, the labeling screen also POSTs to the same URL, on
+  open and after every edit: `{ item, annotation: { values, ranges, reviewed } }`, holding only
+  what the person labeled (never auto-added labels; `reviewed` only lists groups with a label).
+  It expects a `Suggestion` for the whole scene (`values`, `ranges`), drawn instead of the pushed
+  ones. Labels at or above the `autoAcceptThreshold` setting (default 0.9) are added to the draft
+  on their own; ones the person removes are not added again.
 
 ## HTTP API
 

@@ -1,5 +1,5 @@
 import { isGroupActive, itemLength, validateAnnotation } from '@atlas/contracts';
-import type { AnnotationStatus, Group, ItemDetail, ItemView, Project, Range } from '@atlas/contracts';
+import type { AnnotationStatus, Group, ItemDetail, ItemView, Project, Range, Suggestion } from '@atlas/contracts';
 import type { PlayerHandle } from '@atlas/contracts/web';
 import type { Context } from '@neoworks/extension-system';
 import { apiItemPath, labelPath, queuePath } from '../queue/itemLink';
@@ -27,11 +27,17 @@ import type { KeyPress, LabelAction } from './keyboardMap';
 import { MIN_RANGE_SECONDS, addRange, closePending, deleteRange, effectiveSpan, findPending, isSameSpan, itemTimeOf, refineRange, replaceRange, restartPending, togglePending, trimEdge } from './ranges';
 import type { PendingRange, RangeTarget } from './ranges';
 import { acceptProposals, chooseSuggestion } from './suggestions';
+import { confidentAdditions, emptyAutoAdded, personsAnnotation, rangeKey, valueKey } from './liveSuggestions';
+import type { AutoAdded, LiveAnnotation } from './liveSuggestions';
 import { labelTracks, rangeBetween, rangesFromHere } from './timeline';
 import type { SuggestedRange } from './timeline';
 import { settings } from '../settings/settings.svelte';
 
 const NOTICE_LIFETIME_MS = 4000;
+/** Edits in quick succession ask the live endpoint once. */
+const LIVE_DELAY_MS = 300;
+/** The first ask for a scene embeds it densely, which can take a while. */
+const LIVE_SCENE_TIMEOUT_MS = 120_000;
 
 /** Everything the labeling screen knows and can do for one item at a time. */
 /** How long the leader waits for the key that completes its sequence. */
@@ -45,6 +51,13 @@ function tookMessage(count: number): string {
     return 'Took 1 suggested section from here';
   }
   return `Took ${count} suggested sections from here`;
+}
+
+function addedMessage(count: number): string {
+  if (count === 1) {
+    return 'Added 1 confident label';
+  }
+  return `Added ${count} confident labels`;
 }
 
 export class LabelingSession {
@@ -74,6 +87,19 @@ export class LabelingSession {
   serverProblems = $state.raw<string[]>([]);
   notice = $state('');
   handle = $state.raw<PlayerHandle | undefined>(undefined);
+  /** The adapter's latest whole-scene answer to the draft (POST to liveSuggestions). */
+  liveSuggestion = $state.raw<Suggestion | undefined>(undefined);
+  /** A live request is on its way. */
+  liveUpdating = $state(false);
+
+  /** Labels atlas added by itself and still in the draft; never sent to the model as the person's. */
+  private autoAdded: AutoAdded = emptyAutoAdded();
+  /** Everything ever auto-added on this item: what the person removed is not added again. */
+  private autoOffered: AutoAdded = emptyAutoAdded();
+  private liveCounter = 0;
+  private liveTimer: ReturnType<typeof setTimeout> | undefined;
+  private liveAbort: AbortController | undefined;
+  private lastLiveRequest = '';
 
   private loadedFingerprint = $state('');
   private lastTouchedLabel = $state.raw<Record<string, string>>({});
@@ -127,6 +153,9 @@ export class LabelingSession {
   readonly suggestion = $derived.by(() => {
     if (this.detail === undefined || this.project === undefined) {
       return undefined;
+    }
+    if (this.liveSuggestion !== undefined) {
+      return this.liveSuggestion;
     }
     return chooseSuggestion(this.detail.suggestions, this.project.prefillSource);
   });
@@ -249,6 +278,8 @@ export class LabelingSession {
     this.lastTouchedLabel = {};
     this.focusedGroupId = this.focusable[0]?.id;
     this.restartPlayback(sameAsset);
+    this.resetLive();
+    this.scheduleLive();
   }
 
   /** A new video loads itself paused at its span start; the same video just jumps to the new scene, paused. */
@@ -366,6 +397,7 @@ export class LabelingSession {
     }
     this.draft = change(this.taxonomy, this.draft);
     this.serverProblems = [];
+    this.scheduleLive();
   }
 
   focusGroup(groupId: string): void {
@@ -889,6 +921,121 @@ export class LabelingSession {
     clearTimeout(this.noticeTimer);
     clearTimeout(this.leaderTimer);
     this.loadCounter += 1;
+    this.resetLive();
+  }
+
+  // --- live suggestions ------------------------------------------------------------------
+
+  private resetLive(): void {
+    clearTimeout(this.liveTimer);
+    this.liveAbort?.abort();
+    this.liveCounter += 1;
+    this.liveSuggestion = undefined;
+    this.liveUpdating = false;
+    this.lastLiveRequest = '';
+    this.autoAdded = emptyAutoAdded();
+    this.autoOffered = emptyAutoAdded();
+  }
+
+  private scheduleLive(): void {
+    if (this.project?.liveSuggestions === undefined || this.item === undefined) {
+      return;
+    }
+    clearTimeout(this.liveTimer);
+    this.liveTimer = setTimeout(() => void this.askLive(), LIVE_DELAY_MS);
+  }
+
+  /** Asks for the whole scene again, unless what the person labeled did not change since the last ask. */
+  private async askLive(): Promise<void> {
+    const url = this.project?.liveSuggestions;
+    const item = this.item;
+    if (url === undefined || item === undefined) {
+      return;
+    }
+    const annotation = personsAnnotation(this.draft, this.autoAdded);
+    const request = JSON.stringify({ item: item.id, annotation });
+    if (request === this.lastLiveRequest) {
+      return;
+    }
+    this.lastLiveRequest = request;
+    this.liveAbort?.abort();
+    this.liveAbort = new AbortController();
+    this.liveCounter += 1;
+    const thisRequest = this.liveCounter;
+    this.liveUpdating = true;
+    const answer = await this.postLive(url, item.id, annotation, this.liveAbort.signal);
+    if (thisRequest !== this.liveCounter) {
+      return;
+    }
+    this.liveUpdating = false;
+    if (answer === undefined) {
+      this.lastLiveRequest = '';
+      return;
+    }
+    this.liveSuggestion = answer;
+    this.addConfident(answer);
+  }
+
+  private async postLive(url: string, itemId: string, annotation: LiveAnnotation, signal: AbortSignal): Promise<Suggestion | undefined> {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item: itemId, annotation }),
+        signal: AbortSignal.any([signal, AbortSignal.timeout(LIVE_SCENE_TIMEOUT_MS)]),
+      });
+      if (!response.ok) {
+        return undefined;
+      }
+      const body = (await response.json()) as Omit<Suggestion, 'itemId'>;
+      return { ...body, itemId, source: 'live' };
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Labels the model is at least `autoAcceptThreshold` sure of go into the draft as auto-added. */
+  private addConfident(suggestion: Suggestion): void {
+    const threshold = settings.value.autoAcceptThreshold;
+    if (this.taxonomy === undefined || this.loading || threshold > 1) {
+      return;
+    }
+    const additions = confidentAdditions(this.taxonomy, this.draft, suggestion, threshold, this.autoOffered);
+    const count = additions.values.length + additions.ranges.length;
+    if (count === 0) {
+      return;
+    }
+    const before = this.draft;
+    let next = before;
+    for (const addition of additions.values) {
+      next = toggleLabel(this.taxonomy, next, addition.group, addition.label);
+    }
+    for (const range of additions.ranges) {
+      next = addRange(this.taxonomy, next, range);
+    }
+    this.draft = next;
+    this.rememberAutoAdded(before, next);
+    this.say(addedMessage(count));
+  }
+
+  /** Everything the additions put in the draft (refinement parents included) counts as auto-added. */
+  private rememberAutoAdded(before: Draft, after: Draft): void {
+    const previousRanges = new Set(before.ranges.map(rangeKey));
+    for (const range of after.ranges) {
+      const key = rangeKey(range);
+      if (!previousRanges.has(key)) {
+        this.autoAdded.ranges.add(key);
+        this.autoOffered.ranges.add(key);
+      }
+    }
+    for (const [groupId, labelIds] of Object.entries(after.values)) {
+      for (const labelId of labelIds) {
+        if (!valuesOfGroup(before, groupId).includes(labelId)) {
+          this.autoAdded.values.add(valueKey(groupId, labelId));
+          this.autoOffered.values.add(valueKey(groupId, labelId));
+        }
+      }
+    }
   }
 }
 

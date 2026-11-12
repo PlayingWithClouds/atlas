@@ -45,6 +45,8 @@ export interface Settings {
   expandMoreGroups: boolean;
   /** How long S waits for the adapter's live answer before using the pushed suggestions. */
   liveTimeoutMs: number;
+  /** Live suggestions at least this sure are added to the draft by themselves; above 1 turns that off. */
+  autoAcceptThreshold: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -55,7 +57,8 @@ export const DEFAULT_SETTINGS: Settings = {
   frameJump: 10,
   zoomStep: 1.6,
   expandMoreGroups: true,
-  liveTimeoutMs: 3000
+  liveTimeoutMs: 3000,
+  autoAcceptThreshold: 0.9
 };
 
 function withDefaults(raw: unknown): Settings {

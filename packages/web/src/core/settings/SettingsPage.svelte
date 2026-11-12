@@ -253,6 +253,8 @@
 			<input id="zoom-step" class="input input-sm" type="number" min="1.05" step="0.05" value={settings.value.zoomStep} onchange={(event) => setNumber('zoomStep', event.currentTarget.value, 1.05)} />
 			<label class="text-default" for="live-timeout">Live suggestions wait <span class="text-dim text-sm">(ms, then S uses pushed ones)</span></label>
 			<input id="live-timeout" class="input input-sm" type="number" min="100" step="100" value={settings.value.liveTimeoutMs} onchange={(event) => setNumber('liveTimeoutMs', event.currentTarget.value, 100)} />
+			<label class="text-default" for="auto-accept">Add labels by themselves from <span class="text-dim text-sm">(model certainty 0.5–1; above 1 turns it off)</span></label>
+			<input id="auto-accept" class="input input-sm" type="number" min="0.5" step="0.01" value={settings.value.autoAcceptThreshold} onchange={(event) => setNumber('autoAcceptThreshold', event.currentTarget.value, 0.5)} />
 		</div>
 	</section>
 
