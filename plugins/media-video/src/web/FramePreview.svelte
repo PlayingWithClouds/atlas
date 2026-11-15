@@ -1,8 +1,8 @@
 <script lang="ts">
-	// The still at one moment, for the timeline's hover preview. The last exact frame stays on screen
-	// until the next one is grabbed; the thumbnail track's coarse tile is only shown when the pointer
-	// jumped further than a tile spans (or nothing is on screen yet), so scrubbing never flickers.
-	// Stale answers are dropped so the picture always belongs to the latest position.
+	// The still at one moment, for the timeline's hover preview. Whatever arrives (a sprite tile from
+	// the thumbnail track, instant but coarse, or an exact frame, one network seek each) is drawn when
+	// it is nearer the pointer than the picture on screen. While scrubbing fast, seeks finish after the
+	// pointer moved on; showing them anyway keeps the preview moving instead of frozen until it stops.
 	import type { FramePreviewProps } from '@atlas/contracts/web';
 	import { onDestroy } from 'svelte';
 	import { Stills, paintStill } from './stills';
@@ -15,51 +15,52 @@
 	let coarse = $state(false);
 	let stills: Stills | undefined;
 	let stillsUrl = '';
-	let latest = 0;
-	/** Asset seconds of the exact frame on screen. */
-	let exactAt: number | undefined;
+	/** Asset seconds the pointer is at now. */
+	let wanted = 0;
+	/** Asset seconds of the picture on screen, and whether it is an exact frame. */
+	let shownAt: number | undefined;
+	let shownExact = false;
 
 	function stillsFor(): Stills {
 		if (stills === undefined || stillsUrl !== asset.url) {
 			stills?.release();
 			stills = new Stills(asset);
 			stillsUrl = asset.url;
-			exactAt = undefined;
+			shownAt = undefined;
 		}
 		return stills;
 	}
 
-	function paint(request: number, still: Still | undefined): boolean {
-		if (request !== latest || !(canvas instanceof HTMLCanvasElement) || still === undefined) {
-			return false;
+	/** Whether a picture of moment `at` beats the one on screen (an exact frame beats a tile as near). */
+	function better(at: number, exact: boolean): boolean {
+		if (shownAt === undefined) {
+			return true;
+		}
+		const distance = Math.abs(at - wanted);
+		const shownDistance = Math.abs(shownAt - wanted);
+		return distance < shownDistance || (distance === shownDistance && exact && !shownExact);
+	}
+
+	function paint(source: Stills, still: Still | undefined, at: number, exact: boolean): void {
+		if (source !== stills || still === undefined || !(canvas instanceof HTMLCanvasElement) || !better(at, exact)) {
+			return;
 		}
 		paintStill(canvas, still);
 		painted = true;
-		return true;
-	}
-
-	/** The coarse tile helps only when the exact frame on screen is further away than a tile spans. */
-	async function wantsCoarse(source: Stills, at: number): Promise<boolean> {
-		if (exactAt === undefined) {
-			return true;
-		}
-		return Math.abs(at - exactAt) > (await source.spacing());
+		shownAt = at;
+		shownExact = exact;
+		coarse = !exact || at !== wanted;
 	}
 
 	async function show(at: number): Promise<void> {
-		latest += 1;
-		const request = latest;
+		wanted = at;
 		const source = stillsFor();
 		const exact = source.exact(at, true);
-		if (await wantsCoarse(source, at)) {
-			if (paint(request, await source.quick(at))) {
-				coarse = true;
-			}
+		const tile = await source.tile(at);
+		if (tile !== undefined) {
+			paint(source, tile.still, tile.at, false);
 		}
-		if (paint(request, await exact)) {
-			exactAt = at;
-			coarse = false;
-		}
+		paint(source, await exact, at, true);
 	}
 
 	$effect(() => {

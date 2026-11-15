@@ -72,15 +72,26 @@ export class Stills {
       return;
     }
     this.cues = loadThumbnailTrack(asset.thumbnails);
+    // the sprite is wanted on the first hover; fetching it now saves that wait
+    void this.cues.then((cues) => (cues.length > 0 ? loadImage(cues[0].image) : undefined));
   }
 
   /** The track's still nearest `seconds`; undefined without a track. */
   async quick(seconds: number): Promise<Still | undefined> {
+    return (await this.tile(seconds))?.still;
+  }
+
+  /** Like quick, with the moment the still shows (the middle of its cue). */
+  async tile(seconds: number): Promise<{ still: Still; at: number } | undefined> {
     const cue = cueAt(await this.cues, seconds);
     if (cue === undefined) {
       return undefined;
     }
-    return stillOfCue(cue);
+    const still = await stillOfCue(cue);
+    if (still === undefined) {
+      return undefined;
+    }
+    return { still, at: (cue.start + cue.end) / 2 };
   }
 
   /** Seconds between the track's stills; Infinity without a track. */

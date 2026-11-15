@@ -346,9 +346,13 @@
 		hover = hoverAt(event.clientX);
 	}
 
-	// The page shows the hovered frame in the player (scrubbing too); dragging a bar's edge shows
-	// the real video, which seeks to that edge.
+	// The page shows the hovered frame in the player (scrubbing too), and the moving end of a range
+	// being drawn; dragging a bar's edge shows the real video, which seeks to that edge.
 	$effect(() => {
+		if (drag !== undefined && drag.kind === 'create') {
+			onhover(drag.current);
+			return;
+		}
 		if (hover === undefined || (drag !== undefined && drag.kind !== 'scrub')) {
 			onhover(undefined);
 			return;
