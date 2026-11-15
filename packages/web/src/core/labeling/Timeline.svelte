@@ -4,16 +4,17 @@
 	// and resize by dragging, select on click, loop on double-click; Shift+drag erases. Hovering,
 	// scrubbing and dragging snap to range edges (Alt: no snapping). Times on screen are asset
 	// seconds; ranges are stored item-relative.
-	import type { Asset, Group, Range, Span } from '@atlas/contracts';
+	import type { Asset, FrameConfidence, Group, Range, Span } from '@atlas/contracts';
 	import type { MediaPlayerContribution } from '@atlas/contracts/web';
 	import MagnifyingGlassMinusIcon from 'phosphor-svelte/lib/MagnifyingGlassMinus';
 	import MagnifyingGlassPlusIcon from 'phosphor-svelte/lib/MagnifyingGlassPlus';
 	import ArrowsOutLineHorizontalIcon from 'phosphor-svelte/lib/ArrowsOutLineHorizontal';
 	import RepeatIcon from 'phosphor-svelte/lib/Repeat';
+	import ChartLineIcon from 'phosphor-svelte/lib/ChartLine';
 	import TrashIcon from 'phosphor-svelte/lib/Trash';
 	import type { PendingRange, RangeTarget } from './ranges';
 	import type { LabelTrack, RangeDragMode, SuggestedRange, TimelineWindow } from './timeline';
-	import { draggedRange, nearestAnchor, pageTo, panWindow, percentAt, secondsAtFraction, snapToAnchors, tickStep, ticksOf, timelineWindow, zoomWindow } from './timeline';
+	import { confidenceStrip, draggedRange, nearestAnchor, pageTo, panWindow, percentAt, secondsAtFraction, snapToAnchors, tickStep, ticksOf, timelineWindow, zoomWindow } from './timeline';
 	import { formatClock } from '../shared/time';
 	import { settings } from '../settings/settings.svelte';
 	import { untrack } from 'svelte';
@@ -44,7 +45,10 @@
 		ondelete,
 		onhover,
 		onscrub,
-		zoomRequest
+		zoomRequest,
+		confidence,
+		confidenceOn,
+		ontoggleconfidence
 	}: {
 		asset: Asset;
 		media: MediaPlayerContribution | undefined;
@@ -81,6 +85,10 @@
 		onscrub: () => void;
 		/** Zoom by `factor` around the playhead each time `id` changes (keyboard + / -). */
 		zoomRequest: { id: number; factor: number } | undefined;
+		/** Per-frame probabilities to color the tracks with; undefined while the view is off or nothing came back yet. */
+		confidence: FrameConfidence | undefined;
+		confidenceOn: boolean;
+		ontoggleconfidence: () => void;
 	} = $props();
 
 	const FILMSTRIP_CELL_PIXELS = 128;
@@ -702,6 +710,12 @@
 					class="bg-surface relative cursor-crosshair rounded {track.refines ? 'h-7' : 'h-9'} {track.armed ? 'ring-violet/50 ring-1' : ''}"
 					title={trackTitle(track)}
 				>
+					{#if confidence !== undefined}
+						{@const strip = confidenceStrip(confidence, { group: track.group.id, label: track.label.id })}
+						{#if strip !== undefined}
+							<div class="confidence-strip" style="left: {left(itemStart + strip.start)}%; width: {widthBetween(itemStart + strip.start, itemStart + strip.end)}%; background: {strip.gradient}"></div>
+						{/if}
+					{/if}
 					{#if track.whole}
 						<div class="bg-violet/25 border-violet/50 pointer-events-none absolute inset-y-0.5 flex items-center rounded-sm border border-dashed gap-1 overflow-hidden px-1.5 text-sm whitespace-nowrap text-white" style="left: {left(wholeSpan().start)}%; width: {widthBetween(wholeSpan().start, wholeSpan().end)}%">
 							<span class="font-medium">{track.label.name}</span>
@@ -828,6 +842,7 @@
 			<span class="min-w-0 flex-1 truncate"><span class="font-mono">/</span> start a label at the playhead · <span class="font-mono">]</span> end it · <span class="font-mono">S</span> pick suggestions from here · drag in a track or a bar's edges (Shift: erase) · <span class="font-mono">Ctrl+Z</span> undo · <span class="font-mono">?</span> all keys</span>
 		{/if}
 		<div class="flex shrink-0 gap-0.5">
+			<button type="button" tabindex="-1" class="btn btn-xs btn-square {confidenceOn ? 'btn-primary' : 'btn-ghost'}" onmousedown={(event) => event.preventDefault()} onclick={ontoggleconfidence} title="Model confidence per frame, red (unlikely) to green (likely); comes with the next live answer"><ChartLineIcon size={14} /></button>
 			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" onmousedown={(event) => event.preventDefault()} onclick={() => zoomBy(settings.value.zoomStep)} title="Zoom out (wheel, -)"><MagnifyingGlassMinusIcon size={14} /></button>
 			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" onmousedown={(event) => event.preventDefault()} onclick={() => zoomBy(1 / settings.value.zoomStep)} title="Zoom in around the playhead (wheel, +)"><MagnifyingGlassPlusIcon size={14} /></button>
 			<button type="button" tabindex="-1" class="btn btn-ghost btn-xs btn-square" disabled={!zoomed} onmousedown={(event) => event.preventDefault()} onclick={fit} title="Fit the item"><ArrowsOutLineHorizontalIcon size={14} /></button>
@@ -844,6 +859,15 @@
 		z-index: 15;
 		background: color-mix(in srgb, var(--bg) 72%, transparent);
 		backdrop-filter: grayscale(1);
+	}
+
+	.confidence-strip {
+		pointer-events: none;
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		border-radius: 0.25rem;
+		opacity: 0.55;
 	}
 
 	.erasing {

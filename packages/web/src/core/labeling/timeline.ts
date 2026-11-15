@@ -1,5 +1,5 @@
 import { isGroupActive } from '@atlas/contracts';
-import type { Group, Label, Range, Span } from '@atlas/contracts';
+import type { FrameConfidence, Group, Label, Range, Span } from '@atlas/contracts';
 import { MIN_RANGE_SECONDS } from './ranges';
 import type { RangeTarget } from './ranges';
 
@@ -151,6 +151,8 @@ export interface TrackInputs {
   armed?: RangeTarget;
   /** Labels started at the playhead and waiting for their end. */
   open?: RangeTarget[];
+  /** Labels that get a track even with nothing on them (the confidence view's likely labels). */
+  shown?: RangeTarget[];
 }
 
 function overlaps(first: Range, second: Range): boolean {
@@ -183,6 +185,13 @@ function isOpen(inputs: TrackInputs, group: Group, label: Label): boolean {
     return false;
   }
   return inputs.open.some((target) => target.group === group.id && target.label === label.id);
+}
+
+function isShownAnyway(inputs: TrackInputs, group: Group, label: Label): boolean {
+  if (inputs.shown === undefined || !isActive(inputs, group)) {
+    return false;
+  }
+  return inputs.shown.some((target) => target.group === group.id && target.label === label.id);
 }
 
 function isArmed(inputs: TrackInputs, group: Group, label: Label): boolean {
@@ -239,7 +248,8 @@ function trackOf(inputs: TrackInputs, group: Group, label: Label, refines?: Rang
   const ghosts = ghostsOf(inputs, group, label, all);
   const armed = isArmed(inputs, group, label);
   const open = isOpen(inputs, group, label);
-  if (!whole && ranges.length === 0 && ghosts.length === 0 && !armed && !open) {
+  const shown = isShownAnyway(inputs, group, label);
+  if (!whole && ranges.length === 0 && ghosts.length === 0 && !armed && !open && !shown) {
     return undefined;
   }
   // A refinement set for the whole item is already noted on its parent's bars.
@@ -359,4 +369,48 @@ export function nearestAnchor(seconds: number, anchors: number[], tolerance: num
     }
   }
   return best;
+}
+
+// --- confidence view -----------------------------------------------------------------------
+
+/** A label's per-frame probabilities as one strip: item-relative span and a red-to-green CSS gradient. */
+export interface ConfidenceStrip {
+  start: number;
+  end: number;
+  gradient: string;
+}
+
+/** Labels whose probability reaches `minPeak` somewhere: they get a track in the confidence view. */
+export function likelyLabels(confidence: FrameConfidence, minPeak: number): RangeTarget[] {
+  const targets: RangeTarget[] = [];
+  for (const [groupId, labels] of Object.entries(confidence.values)) {
+    for (const [labelId, probabilities] of Object.entries(labels)) {
+      if (Math.max(...probabilities) >= minPeak) {
+        targets.push({ group: groupId, label: labelId });
+      }
+    }
+  }
+  return targets;
+}
+
+export function confidenceStrip(confidence: FrameConfidence, target: RangeTarget): ConfidenceStrip | undefined {
+  const probabilities = confidence.values[target.group]?.[target.label];
+  const times = confidence.times;
+  if (probabilities === undefined || times.length < 2 || probabilities.length !== times.length) {
+    return undefined;
+  }
+  const step = times[1] - times[0];
+  const start = times[0];
+  const end = times[times.length - 1] + step;
+  const stops = times.map((time, index) => {
+    const percent = (((time + step / 2 - start) / (end - start)) * 100).toFixed(3);
+    return `${confidenceColor(probabilities[index])} ${percent}%`;
+  });
+  return { start, end, gradient: `linear-gradient(to right, ${stops.join(', ')})` };
+}
+
+/** 0 is red, 0.5 yellow, 1 green. */
+export function confidenceColor(probability: number): string {
+  const clamped = Math.min(1, Math.max(0, probability));
+  return `hsl(${Math.round(clamped * 120)} 75% 45%)`;
 }

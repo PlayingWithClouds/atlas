@@ -132,6 +132,15 @@ export interface Suggestion {
   ranges?: (Range & { score: number })[];
   /** Higher = show sooner. */
   priority?: number;
+  /** Per-frame probabilities, drawn on the timeline in the confidence view (live answers only). */
+  confidence?: FrameConfidence;
+}
+
+export interface FrameConfidence {
+  /** Item-relative seconds of each frame. */
+  times: number[];
+  /** Group id → label id → probability 0..1 at each of `times`. */
+  values: Record<string, Record<string, number[]>>;
 }
 
 // --- projects ----------------------------------------------------------------------------

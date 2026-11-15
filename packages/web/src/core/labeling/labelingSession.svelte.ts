@@ -1,5 +1,5 @@
 import { isGroupActive, itemLength, validateAnnotation } from '@atlas/contracts';
-import type { AnnotationStatus, Group, ItemDetail, ItemView, Project, Range, Suggestion } from '@atlas/contracts';
+import type { AnnotationStatus, FrameConfidence, Group, ItemDetail, ItemView, Project, Range, Suggestion } from '@atlas/contracts';
 import type { PlayerHandle } from '@atlas/contracts/web';
 import type { Context } from '@neoworks/extension-system';
 import { apiFilterSearch } from '../queue/apiFilter';
@@ -32,7 +32,7 @@ import type { PendingRange, RangeTarget } from './ranges';
 import { acceptProposals, chooseSuggestion } from './suggestions';
 import { confidentAdditions, emptyAutoAdded, personsAnnotation, rangeKey, valueKey } from './liveSuggestions';
 import type { AutoAdded, LiveAnnotation } from './liveSuggestions';
-import { labelTracks, rangeBetween, rangesFromHere } from './timeline';
+import { labelTracks, likelyLabels, rangeBetween, rangesFromHere } from './timeline';
 import type { SuggestedRange } from './timeline';
 import { settings } from '../settings/settings.svelte';
 import { browserDraftStore, fitToTaxonomy } from './draftStore';
@@ -40,6 +40,8 @@ import { browserDraftStore, fitToTaxonomy } from './draftStore';
 const NOTICE_LIFETIME_MS = 4000;
 /** Edits in quick succession ask the live endpoint once. */
 const LIVE_DELAY_MS = 300;
+/** In the confidence view, labels this likely somewhere get a track even with nothing on them. */
+const CONFIDENCE_TRACK_PEAK = 0.3;
 /** The first ask for a scene embeds it densely, which can take a while. */
 const LIVE_SCENE_TIMEOUT_MS = 120_000;
 
@@ -99,6 +101,8 @@ export class LabelingSession {
   liveSuggestion = $state.raw<Suggestion | undefined>(undefined);
   /** A live request is on its way. */
   liveUpdating = $state(false);
+  /** The timeline colors each track by the model's per-frame probability (red → green). */
+  showConfidence = $state(false);
 
   /** Labels atlas added by itself and still in the draft; never sent to the model as the person's. */
   private autoAdded: AutoAdded = emptyAutoAdded();
@@ -201,7 +205,21 @@ export class LabelingSession {
       suggested,
       armed: this.armed,
       open: this.openRanges,
+      shown: this.likelyTargets,
     });
+  });
+  /** The latest live answer's per-frame probabilities, while the confidence view is on. */
+  readonly confidence = $derived.by((): FrameConfidence | undefined => {
+    if (!this.showConfidence || this.liveSuggestion === undefined) {
+      return undefined;
+    }
+    return this.liveSuggestion.confidence;
+  });
+  private readonly likelyTargets = $derived.by((): RangeTarget[] => {
+    if (this.confidence === undefined) {
+      return [];
+    }
+    return likelyLabels(this.confidence, CONFIDENCE_TRACK_PEAK);
   });
   /** Refinement groups of the selected range's label, with the labels set for exactly its span. */
   readonly selectedRefinements = $derived.by(() => {
@@ -910,6 +928,10 @@ export class LabelingSession {
   }
 
   /** Loops one range; again on the same range goes back to the item. */
+  toggleConfidence(): void {
+    this.showConfidence = !this.showConfidence;
+  }
+
   toggleLoop(range: Range): void {
     if (this.loopedRange === range) {
       this.loopedRange = undefined;

@@ -176,6 +176,9 @@
 							onhover={setPreview}
 							onscrub={() => session.pause()}
 							ondelete={(range) => session.deleteRange(range)}
+							confidence={session.confidence}
+							confidenceOn={session.showConfidence}
+							ontoggleconfidence={() => session.toggleConfidence()}
 						/>
 						{#if session.loopedRange}
 							<div class="text-amber flex items-center gap-2 text-sm">
