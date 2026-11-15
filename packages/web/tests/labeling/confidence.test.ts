@@ -31,7 +31,7 @@ describe('confidence view', () => {
   });
 
   test('the strip spans every frame and runs red to green', () => {
-    const strip = confidenceStrip(confidence, { group: 'activity', label: 'talking' });
+    const strip = confidenceStrip(confidence, { group: 'activity', label: 'talking' }, { start: 0, end: 100 });
     expect(strip?.start).toBe(0);
     expect(strip?.end).toBe(4);
     expect(strip?.gradient).toContain(`${confidenceColor(0.9)} 37.500%`);
@@ -39,7 +39,15 @@ describe('confidence view', () => {
     expect(confidenceColor(1)).toBe('hsl(120 75% 45%)');
   });
 
+  test('zoomed in, the strip covers only the visible frames', () => {
+    const strip = confidenceStrip(confidence, { group: 'activity', label: 'talking' }, { start: 1, end: 3 });
+    expect(strip?.start).toBe(1);
+    expect(strip?.end).toBe(3);
+    expect(strip?.gradient).toContain(`${confidenceColor(0.9)} 25.000%`);
+    expect(strip?.gradient).not.toContain(confidenceColor(0.2));
+  });
+
   test('no strip for a label the answer does not have', () => {
-    expect(confidenceStrip(confidence, { group: 'position', label: 'sitting' })).toBeUndefined();
+    expect(confidenceStrip(confidence, { group: 'position', label: 'sitting' }, { start: 0, end: 100 })).toBeUndefined();
   });
 });

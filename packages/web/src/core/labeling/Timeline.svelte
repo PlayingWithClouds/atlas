@@ -711,7 +711,7 @@
 					title={trackTitle(track)}
 				>
 					{#if confidence !== undefined}
-						{@const strip = confidenceStrip(confidence, { group: track.group.id, label: track.label.id })}
+						{@const strip = confidenceStrip(confidence, { group: track.group.id, label: track.label.id }, { start: axis.start - itemStart, end: axis.end - itemStart })}
 						{#if strip !== undefined}
 							<div class="confidence-strip" style="left: {left(itemStart + strip.start)}%; width: {widthBetween(itemStart + strip.start, itemStart + strip.end)}%; background: {strip.gradient}"></div>
 						{/if}

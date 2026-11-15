@@ -407,19 +407,30 @@ export function likelyLabels(confidence: FrameConfidence, minPeak: number): Rang
   return targets;
 }
 
-export function confidenceStrip(confidence: FrameConfidence, target: RangeTarget): ConfidenceStrip | undefined {
+/** The strip of `target` cut to `visible` (item-relative seconds), so zooming in shows its frames wider. */
+export function confidenceStrip(confidence: FrameConfidence, target: RangeTarget, visible: Span): ConfidenceStrip | undefined {
   const probabilities = confidence.values[target.group]?.[target.label];
   const times = confidence.times;
   if (probabilities === undefined || times.length < 2 || probabilities.length !== times.length) {
     return undefined;
   }
   const step = times[1] - times[0];
-  const start = times[0];
-  const end = times[times.length - 1] + step;
-  const stops = times.map((time, index) => {
+  const start = Math.max(times[0], visible.start);
+  const end = Math.min(times[times.length - 1] + step, visible.end);
+  if (end <= start) {
+    return undefined;
+  }
+  const stops: string[] = [];
+  times.forEach((time, index) => {
+    if (time + step <= start || time >= end) {
+      return;
+    }
     const percent = (((time + step / 2 - start) / (end - start)) * 100).toFixed(3);
-    return `${confidenceColor(probabilities[index])} ${percent}%`;
+    stops.push(`${confidenceColor(probabilities[index])} ${percent}%`);
   });
+  if (stops.length === 1) {
+    stops.push(stops[0]);
+  }
   return { start, end, gradient: `linear-gradient(to right, ${stops.join(', ')})` };
 }
 
