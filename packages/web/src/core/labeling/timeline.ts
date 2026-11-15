@@ -171,13 +171,27 @@ function ghostsOf(inputs: TrackInputs, group: Group, label: Label, ranges: Range
   if (!isActive(inputs, group)) {
     return [];
   }
-  return inputs.suggested.filter(
-    (ghost) =>
-      ghost.group === group.id &&
-      ghost.label === label.id &&
-      ghost.score >= GHOST_THRESHOLD &&
-      !ranges.some((range) => overlaps(range, ghost)),
-  );
+  return inputs.suggested
+    .filter((ghost) => ghost.group === group.id && ghost.label === label.id && ghost.score >= GHOST_THRESHOLD)
+    .flatMap((ghost) => outsideRanges(ghost, ranges));
+}
+
+/** The parts of a suggestion the label's ranges leave open, each at least MIN_RANGE_SECONDS long. */
+function outsideRanges(ghost: SuggestedRange, ranges: Range[]): SuggestedRange[] {
+  let pieces: SuggestedRange[] = [ghost];
+  for (const range of ranges) {
+    pieces = pieces.flatMap((piece) => cutOut(piece, range));
+  }
+  return pieces.filter((piece) => piece.end - piece.start >= MIN_RANGE_SECONDS);
+}
+
+function cutOut(piece: SuggestedRange, range: Range): SuggestedRange[] {
+  if (!overlaps(piece, range)) {
+    return [piece];
+  }
+  const left = { ...piece, end: Math.min(piece.end, range.start) };
+  const right = { ...piece, start: Math.max(piece.start, range.end) };
+  return [left, right].filter((part) => part.end > part.start);
 }
 
 function isOpen(inputs: TrackInputs, group: Group, label: Label): boolean {

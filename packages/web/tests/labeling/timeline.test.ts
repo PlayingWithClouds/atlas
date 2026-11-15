@@ -103,7 +103,7 @@ describe('label tracks', () => {
     expect(tracks[3].armed).toBe(true);
   });
 
-  test('hides suggestions a range already covers and those of inactive groups', () => {
+  test('trims suggestions to what the ranges leave open and hides those of inactive groups', () => {
     const tracks = labelTracks({
       groups: taxonomy.groups,
       values: {},
@@ -114,9 +114,19 @@ describe('label tracks', () => {
       ],
     });
     expect(tracks).toHaveLength(1);
-    expect(tracks[0].ghosts).toEqual([]);
+    expect(tracks[0].ghosts).toEqual([{ group: 'activity', label: 'talking', start: 4, end: 6, score: 0.9 }]);
     expect(position.id).toBe('position');
     expect(activity.id).toBe('activity');
+  });
+
+  test('a suggestion around a range splits into the parts before and after it', () => {
+    const tracks = labelTracks({
+      groups: taxonomy.groups,
+      values: {},
+      ranges: [{ group: 'activity', label: 'talking', start: 10, end: 20 }],
+      suggested: [{ group: 'activity', label: 'talking', start: 0, end: 30, score: 0.7 }],
+    });
+    expect(tracks[0].ghosts.map((ghost) => [ghost.start, ghost.end])).toEqual([[0, 10], [20, 30]]);
   });
 
   test('refinement tracks follow their parent; exact matches show inside the parent bar', () => {
