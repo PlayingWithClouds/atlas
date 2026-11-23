@@ -133,7 +133,8 @@
 
 		<div class="flex min-h-0 flex-1 {session.loading ? 'opacity-60' : ''}">
 			<div class="flex min-w-0 flex-1 flex-col gap-3 pb-1">
-				<div class="relative min-h-0 flex-1 overflow-hidden bg-black">
+				<!-- the video keeps at least half the height; tracks below scroll instead of squeezing it -->
+				<div class="relative min-h-1/2 flex-1 overflow-hidden bg-black">
 					{#if media}
 						<media.player asset={detail.asset} span={session.playSpan} start={session.startAt} poster={detail.item.poster} onready={(handle) => session.setHandle(handle)} ontime={(seconds) => (session.playhead = seconds)} />
 						{#if media.frame && lastPreviewSeconds !== undefined}
@@ -147,6 +148,7 @@
 					{/if}
 				</div>
 
+				<div class="flex min-h-0 shrink flex-col gap-3 overflow-y-auto">
 				{#if showTimeline && itemSpan}
 					<div class="flex flex-col gap-2 px-4">
 						<Timeline
@@ -196,6 +198,7 @@
 				{/if}
 				<div class="px-4"><MetaDetails {detail} /></div>
 				<KeyLegend />
+				</div>
 			</div>
 
 			<aside class="border-line bg-canvas flex w-[26rem] shrink-0 flex-col border-l">
